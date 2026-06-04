@@ -1,0 +1,2 @@
+# JDB
+Jellyfin Meta DB
