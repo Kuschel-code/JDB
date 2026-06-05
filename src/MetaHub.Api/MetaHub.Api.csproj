@@ -6,6 +6,7 @@
     <ProjectReference Include="..\MetaHub.Ingest\MetaHub.Ingest.csproj" />
     <ProjectReference Include="..\MetaHub.Identification\MetaHub.Identification.csproj" />
     <ProjectReference Include="..\MetaHub.Enrichment\MetaHub.Enrichment.csproj" />
+    <ProjectReference Include="..\MetaHub.Export\MetaHub.Export.csproj" />
   </ItemGroup>
 
   <ItemGroup>

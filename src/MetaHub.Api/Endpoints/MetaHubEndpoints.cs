@@ -3,6 +3,7 @@ using MetaHub.Api.Contracts;
 using MetaHub.Domain.Entities;
 using MetaHub.Domain.Enums;
 using MetaHub.Enrichment;
+using MetaHub.Export;
 using MetaHub.Identification;
 using MetaHub.Infrastructure;
 using MetaHub.Ingest.Anime;
@@ -25,12 +26,14 @@ public static class MetaHubEndpoints
         api.MapGet("/search", Search);
         api.MapPost("/identify", Identify);
         api.MapPost("/files/identify", IdentifyFile);
+        api.MapGet("/work/{id:guid}/nfo", GetWorkNfo);
 
         // Admin / operational endpoints.
         var admin = app.MapGroup("/api/admin");
         admin.MapPost("/ingest/anime", RunAnimeIngest);
         admin.MapPost("/enrich/work/{id:guid}", EnrichWork);
         admin.MapPost("/enrich/anime", EnrichAnime);
+        admin.MapPost("/export/nfo/{id:guid}", ExportNfo);
     }
 
     private static async Task<IResult> GetWork(Guid id, MetaHubDbContext db, CancellationToken ct)
@@ -172,6 +175,22 @@ public static class MetaHubEndpoints
     {
         var enriched = await runner.EnrichAnimeAsync(max, delayMs, force, ct);
         return Results.Ok(new { enriched });
+    }
+
+    private static async Task<IResult> GetWorkNfo(Guid id, NfoExportService export, CancellationToken ct)
+    {
+        var doc = await export.BuildAsync(id, ct);
+        return doc is null ? Results.NotFound() : Results.Text(doc.Content, "application/xml");
+    }
+
+    private static async Task<IResult> ExportNfo(
+        Guid id, string dir, NfoExportService export, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(dir))
+            return Results.BadRequest("'dir' query parameter is required.");
+
+        var path = await export.WriteAsync(id, dir, ct);
+        return path is null ? Results.NotFound() : Results.Ok(new { path });
     }
 
     private static WorkResponse ToResponse(Work w) => new(

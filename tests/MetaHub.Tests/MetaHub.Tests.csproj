@@ -30,6 +30,7 @@
     <ProjectReference Include="..\..\src\MetaHub.Ingest\MetaHub.Ingest.csproj" />
     <ProjectReference Include="..\..\src\MetaHub.Identification\MetaHub.Identification.csproj" />
     <ProjectReference Include="..\..\src\MetaHub.Enrichment\MetaHub.Enrichment.csproj" />
+    <ProjectReference Include="..\..\src\MetaHub.Export\MetaHub.Export.csproj" />
   </ItemGroup>
 
 </Project>

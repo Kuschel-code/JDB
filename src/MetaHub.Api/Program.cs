@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MetaHub.Api.Endpoints;
 using MetaHub.Enrichment;
+using MetaHub.Export;
 using MetaHub.Identification;
 using MetaHub.Infrastructure;
 using MetaHub.Ingest;
@@ -15,6 +16,7 @@ builder.Services.AddMetaHubInfrastructure(connectionString);
 builder.Services.AddAnimeIngest();
 builder.Services.AddIdentification();
 builder.Services.AddEnrichment();
+builder.Services.AddNfoExport();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
