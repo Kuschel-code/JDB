@@ -1,0 +1,161 @@
+using Microsoft.EntityFrameworkCore;
+using MetaHub.Api.Contracts;
+using MetaHub.Domain.Entities;
+using MetaHub.Domain.Enums;
+using MetaHub.Infrastructure;
+using MetaHub.Ingest.Anime;
+
+namespace MetaHub.Api.Endpoints;
+
+/// <summary>
+/// The thin, stable "single source of truth" API for clients (Abschnitt 10 of the concept).
+/// </summary>
+public static class MetaHubEndpoints
+{
+    public static void MapMetaHubEndpoints(this IEndpointRouteBuilder app)
+    {
+        var api = app.MapGroup("/api");
+
+        api.MapGet("/work/{id:guid}", GetWork);
+        api.MapGet("/work/{id:guid}/images", GetWorkImages);
+        api.MapGet("/series/{id:guid}/episodes", GetSeriesEpisodes);
+        api.MapGet("/lookup", Lookup);
+        api.MapGet("/search", Search);
+        api.MapPost("/identify", Identify);
+
+        // Admin / operational endpoints.
+        var admin = app.MapGroup("/api/admin");
+        admin.MapPost("/ingest/anime", RunAnimeIngest);
+    }
+
+    private static async Task<IResult> GetWork(Guid id, MetaHubDbContext db, CancellationToken ct)
+    {
+        var work = await db.Works
+            .Include(w => w.ExternalIds)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(w => w.Id == id, ct);
+
+        return work is null ? Results.NotFound() : Results.Ok(ToResponse(work));
+    }
+
+    private static async Task<IResult> GetWorkImages(Guid id, string? type, MetaHubDbContext db, CancellationToken ct)
+    {
+        var query = db.Images.AsNoTracking().Where(i => i.WorkId == id);
+        if (!string.IsNullOrWhiteSpace(type) && Enum.TryParse<ImageType>(type, true, out var imageType))
+            query = query.Where(i => i.Type == imageType);
+
+        var images = await query
+            .OrderByDescending(i => i.Score)
+            .Select(i => new ImageResponse(
+                i.Type.ToString(), i.Url, i.Lang, i.Width, i.Height, i.Source, i.Score))
+            .ToListAsync(ct);
+
+        return Results.Ok(images);
+    }
+
+    private static async Task<IResult> GetSeriesEpisodes(Guid id, MetaHubDbContext db, CancellationToken ct)
+    {
+        var episodes = await db.Episodes.AsNoTracking()
+            .Where(e => e.SeriesWorkId == id)
+            .OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber)
+            .Select(e => new EpisodeResponse(
+                e.Id, e.SeasonNumber, e.EpisodeNumber, e.AbsoluteNumber, e.AirDate, e.Title, e.Overview))
+            .ToListAsync(ct);
+
+        return Results.Ok(episodes);
+    }
+
+    private static async Task<IResult> Lookup(string source, string id, MetaHubDbContext db, CancellationToken ct)
+    {
+        if (!TryParseSource(source, out var src))
+            return Results.BadRequest($"Unknown source '{source}'.");
+
+        var work = await db.Works
+            .Include(w => w.ExternalIds)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                w => w.ExternalIds.Any(x => x.Source == src && x.ExternalValue == id), ct);
+
+        return work is null ? Results.NotFound() : Results.Ok(ToResponse(work));
+    }
+
+    private static async Task<IResult> Search(
+        string? type, string q, MetaHubDbContext db, CancellationToken ct, int limit = 25)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+            return Results.BadRequest("Query 'q' is required.");
+
+        var query = db.Works.Include(w => w.ExternalIds).AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(type) && Enum.TryParse<MediaType>(type, true, out var mediaType))
+            query = query.Where(w => w.MediaType == mediaType);
+
+        var pattern = $"%{q}%";
+        var works = await query
+            .Where(w => EF.Functions.ILike(w.CanonicalTitle, pattern)
+                     || (w.OriginalTitle != null && EF.Functions.ILike(w.OriginalTitle, pattern)))
+            .OrderBy(w => w.CanonicalTitle)
+            .Take(Math.Clamp(limit, 1, 100))
+            .ToListAsync(ct);
+
+        return Results.Ok(works.Select(ToResponse));
+    }
+
+    private static async Task<IResult> Identify(
+        IdentifyRequest request, MetaHubDbContext db, CancellationToken ct)
+    {
+        // M3 (ED2K hashing + AniDB lookup, AcoustID, ISBN) is not built yet. For now this
+        // resolves against files that have already been identified and stored.
+        MediaFile? file = null;
+        if (!string.IsNullOrWhiteSpace(request.Ed2kHash))
+            file = await db.MediaFiles.AsNoTracking().FirstOrDefaultAsync(f => f.Ed2kHash == request.Ed2kHash, ct);
+        else if (!string.IsNullOrWhiteSpace(request.AcoustId))
+            file = await db.MediaFiles.AsNoTracking().FirstOrDefaultAsync(f => f.AcoustId == request.AcoustId, ct);
+        else if (!string.IsNullOrWhiteSpace(request.Path))
+            file = await db.MediaFiles.AsNoTracking().FirstOrDefaultAsync(f => f.Path == request.Path, ct);
+
+        if (file is { WorkId: not null })
+        {
+            return Results.Ok(new IdentifyResponse(
+                true, file.WorkId, file.EpisodeId, file.IdentifiedBy.ToString(), file.Confidence, null));
+        }
+
+        return Results.Ok(new IdentifyResponse(
+            false, null, null, IdentificationMethod.None.ToString(), 0,
+            "Not identified. Online identification (M3: ED2K/AniDB, AcoustID, ISBN) is not implemented yet."));
+    }
+
+    private static async Task<IResult> RunAnimeIngest(AnimeIngestRunner runner, CancellationToken ct)
+    {
+        var (manami, fribb) = await runner.RunAsync(ct);
+        return Results.Ok(new
+        {
+            manami = new { manami.Created, manami.Updated, manami.ExternalIdsAdded, manami.Skipped },
+            fribb = new { fribb.Updated, fribb.ExternalIdsAdded, fribb.Skipped }
+        });
+    }
+
+    private static WorkResponse ToResponse(Work w) => new(
+        w.Id, w.MediaType, w.CanonicalTitle, w.OriginalTitle, w.ReleaseYear, w.Overview, w.Status,
+        w.ExternalIds.Select(x => new ExternalIdResponse(x.Source.ToString(), x.ExternalValue)).ToList());
+
+    private static bool TryParseSource(string source, out ExternalIdSource parsed)
+    {
+        // Accept the friendly aliases used in the concept's API examples.
+        parsed = source.Trim().ToLowerInvariant() switch
+        {
+            "tmdb" => ExternalIdSource.Tmdb,
+            "tvdb" => ExternalIdSource.Tvdb,
+            "imdb" => ExternalIdSource.Imdb,
+            "mbid" or "musicbrainz" => ExternalIdSource.MusicBrainz,
+            "anilist" => ExternalIdSource.AniList,
+            "mal" => ExternalIdSource.Mal,
+            "anidb" => ExternalIdSource.AniDb,
+            "kitsu" => ExternalIdSource.Kitsu,
+            "isbn" => ExternalIdSource.Isbn,
+            "openlibrary" => ExternalIdSource.OpenLibrary,
+            "wikidata" => ExternalIdSource.Wikidata,
+            _ => ExternalIdSource.Unknown
+        };
+        return parsed != ExternalIdSource.Unknown || Enum.TryParse(source, true, out parsed);
+    }
+}

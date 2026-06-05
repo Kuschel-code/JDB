@@ -1,0 +1,30 @@
+# Build output
+bin/
+obj/
+out/
+publish/
+artifacts/
+
+# Rider / VS / VS Code
+.idea/
+.vs/
+*.user
+*.suo
+
+# Test results
+[Tt]est[Rr]esults/
+*.trx
+coverage*.xml
+coverage*.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local environment overrides
+appsettings.*.local.json
+.env
+*.env.local
+
+# dotnet tools restore marker (keep manifest, ignore restored binaries)
+.dotnet/

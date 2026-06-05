@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: metahub
+      POSTGRES_USER: metahub
+      POSTGRES_PASSWORD: metahub
+    ports:
+      - "5432:5432"
+    volumes:
+      - metahub-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metahub"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: src/MetaHub.Api/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__MetaHub: "Host=db;Port=5432;Database=metahub;Username=metahub;Password=metahub"
+      MetaHub__AutoMigrate: "true"
+    ports:
+      - "8080:8080"
+
+volumes:
+  metahub-db:
