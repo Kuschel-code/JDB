@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -45,11 +46,57 @@ public static class DependencyInjection
         return services;
     }
 
-    /// <summary>Creates the SQLite schema if it does not exist yet (embedded mode).</summary>
+    /// <summary>
+    /// Schema version of the embedded SQLite database. Bump when the model changes in a way
+    /// that <see cref="DatabaseFacade.EnsureCreated"/> cannot reconcile on an existing file
+    /// (e.g. a column's storage type changes), so the cache is rebuilt instead of breaking.
+    /// </summary>
+    private const long EmbeddedSchemaVersion = 2;
+
+    /// <summary>
+    /// Creates the SQLite schema if it does not exist yet (embedded mode). The embedded
+    /// database is a rebuildable cache (ingested datasets + cached enrichment), so when the
+    /// schema version changes it is wiped and recreated — no migration, no durable data lost.
+    /// </summary>
     public static void EnsureMetaHubSchemaCreated(this IServiceProvider services)
     {
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
-        db.Database.EnsureCreated();
+
+        if (!db.Database.IsSqlite())
+        {
+            db.Database.EnsureCreated();
+            return;
+        }
+
+        if (ReadSqliteUserVersion(db) != EmbeddedSchemaVersion)
+        {
+            // Incompatible (or pre-versioning) schema — drop and rebuild from the current model.
+            db.Database.EnsureDeleted();
+            db.Database.EnsureCreated();
+            db.Database.ExecuteSqlRaw($"PRAGMA user_version = {EmbeddedSchemaVersion};");
+        }
+        else
+        {
+            db.Database.EnsureCreated();
+        }
+    }
+
+    private static long ReadSqliteUserVersion(MetaHubDbContext db)
+    {
+        var connection = db.Database.GetDbConnection();
+        var wasClosed = connection.State != ConnectionState.Open;
+        if (wasClosed) connection.Open();
+        try
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA user_version;";
+            return Convert.ToInt64(command.ExecuteScalar() ?? 0L);
+        }
+        finally
+        {
+            // Release the handle before a possible EnsureDeleted so the file can be removed.
+            if (wasClosed) connection.Close();
+        }
     }
 }
