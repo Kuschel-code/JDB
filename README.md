@@ -45,9 +45,14 @@ ingest/enrichment exposed as Jellyfin **Scheduled Tasks**. Datasets come from Gi
    once, then **MetaHub: Enrich metadata**.
 
 > The repository link serves [`manifest.json`](manifest.json). The **Release** workflow
-> populates it automatically: pushing a `v*` tag builds the plugin zip, attaches it to a
-> GitHub Release, and adds the version (with MD5 checksum) to the manifest. So the link
-> becomes installable once a release tag has been pushed.
+> populates it automatically and adds the version (with MD5 checksum) to the manifest, so the
+> link becomes installable once a release exists.
+
+### Cutting a release
+
+Either push a tag (`git tag v0.1.0 && git push origin v0.1.0`) **or** run it from the UI:
+**Actions → Release → Run workflow**, enter `v0.1.0`. The workflow then creates the tag +
+GitHub Release, builds the runtime zips and the plugin zip, and updates `manifest.json`.
 
 ## Get started — standalone server (optional)
 
