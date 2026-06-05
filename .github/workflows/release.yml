@@ -80,10 +80,25 @@ jobs:
         with:
           dotnet-version: "9.0.x"
 
+      - name: Stamp plugin version
+        # Jellyfin derives the installed version from the assembly (and the generated meta.json).
+        # Without this the assembly stays at the csproj default while the manifest advances, so
+        # Jellyfin sees a perpetual "update available" and restart-loops. Keep them in sync.
+        run: |
+          VERSION="${{ needs.setup.outputs.version }}"
+          VERSION="${VERSION#v}"
+          # Jellyfin expects a 4-part version (x.y.z -> x.y.z.0).
+          if [ "$(echo "$VERSION" | tr -cd '.' | wc -c)" -eq 2 ]; then VERSION="${VERSION}.0"; fi
+          echo "PLUGIN_VERSION=$VERSION" >> "$GITHUB_ENV"
+          sed -i "s/^version: .*/version: \"$VERSION\"/" src/MetaHub.Jellyfin/build.yaml
+
       - name: Build Jellyfin plugin
         run: |
           dotnet publish src/MetaHub.Jellyfin/MetaHub.Jellyfin.csproj \
             --configuration Release \
+            -p:Version="$PLUGIN_VERSION" \
+            -p:AssemblyVersion="$PLUGIN_VERSION" \
+            -p:FileVersion="$PLUGIN_VERSION" \
             --output publish/jellyfin-plugin
 
       - name: Package plugin zip
