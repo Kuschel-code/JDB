@@ -46,6 +46,7 @@ src/
   MetaHub.Infrastructure  EF Core DbContext, migrations, PostgreSQL mapping
   MetaHub.Ingest          M2 anime ingest (manami + Fribb) with Polly-backed HTTP
   MetaHub.Api             ASP.NET Core Minimal API
+  MetaHub.Jellyfin        Jellyfin plugin: tabbed admin settings page (M7 head-start)
 tests/
   MetaHub.Tests           Unit tests (parser + ingest)
 docs/
@@ -104,7 +105,7 @@ master records and populates their cross-provider `ExternalId`s. Re-running is i
 - [ ] **M4** Enrichment v1: AniList + Jikan end-to-end (Polly + cache)
 - [ ] **M5** API + NFO export, first Jellyfin test
 - [ ] **M6** More media types: movies/series, music, books
-- [ ] **M7** Jellyfin metadata/image provider plugin
+- [ ] **M7** Jellyfin metadata/image provider plugin _(settings page started in `MetaHub.Jellyfin`)_
 - [ ] **M8** Conflict resolution, image scoring, i18n, monitoring
 
 ## Tests

@@ -45,8 +45,38 @@ jobs:
           name: metahub-${{ matrix.rid }}
           path: artifacts/*.zip
 
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Build Jellyfin plugin
+        run: |
+          dotnet publish src/MetaHub.Jellyfin/MetaHub.Jellyfin.csproj \
+            --configuration Release \
+            --output publish/jellyfin-plugin
+
+      - name: Package plugin zip
+        run: |
+          mkdir -p artifacts
+          cp src/MetaHub.Jellyfin/build.yaml publish/jellyfin-plugin/ || true
+          zip -r -j "artifacts/metahub-jellyfin-plugin-${{ github.ref_name }}.zip" \
+            "publish/jellyfin-plugin/MetaHub.Jellyfin.dll" \
+            "publish/jellyfin-plugin/build.yaml"
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: metahub-jellyfin-plugin
+          path: artifacts/*.zip
+
   release:
-    needs: build
+    needs: [build, plugin]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
