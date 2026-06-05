@@ -9,17 +9,29 @@ public static class MetaHubMapping
 {
     /// <summary>Resolves a MetaHub work from a Jellyfin item's provider ids.</summary>
     public static async Task<WorkDto?> ResolveAsync(
-        MetaHubApiClient client, IReadOnlyDictionary<string, string> providerIds, CancellationToken ct)
+        MetaHubApiClient client, IReadOnlyDictionary<string, string> providerIds, string? lang, CancellationToken ct)
     {
         foreach (var (source, id) in ProviderIdMapper.Candidates(providerIds))
         {
-            var work = await client.LookupAsync(source, id, ct).ConfigureAwait(false);
+            var work = await client.LookupAsync(source, id, lang, ct).ConfigureAwait(false);
             if (work is not null)
                 return work;
         }
 
         return null;
     }
+
+    /// <summary>True when the plugin is configured to provide metadata for this work's media type.</summary>
+    public static bool IsMediaTypeEnabled(string mediaType, Configuration.PluginConfiguration config)
+        => mediaType.ToLowerInvariant() switch
+        {
+            "movie" => config.EnableMovies,
+            "series" => config.EnableSeries,
+            "anime" => config.EnableAnime,
+            "music" => config.EnableMusic,
+            "book" => config.EnableBooks,
+            _ => true
+        };
 
     /// <summary>Copies MetaHub cross-ids back onto the Jellyfin item.</summary>
     public static void ApplyProviderIds(BaseItem item, WorkDto work)

@@ -14,5 +14,6 @@ category: "Metadata"
 artifacts:
   - "MetaHub.Jellyfin.dll"
 changelog: >
-  0.1.0.0 - Initial plugin skeleton with tabbed settings page
-  (Connection / Media types / Identification / About).
+  0.1.0.0 - Metadata/image providers backed by the MetaHub API, with a tabbed settings
+  page (Connection / Library / Server / About). Engine settings stay on the server and are
+  shown read-only via /api/config.

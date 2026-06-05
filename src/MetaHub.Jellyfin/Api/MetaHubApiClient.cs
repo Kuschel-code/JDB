@@ -34,11 +34,13 @@ public class MetaHubApiClient
 
     private static string BaseUrl => Config.ApiBaseUrl.TrimEnd('/');
 
-    /// <summary>Resolves a work by an external id (e.g. source="tmdb").</summary>
-    public async Task<WorkDto?> LookupAsync(string source, string id, CancellationToken ct)
+    /// <summary>Resolves a work by an external id (e.g. source="tmdb"), with optional language.</summary>
+    public async Task<WorkDto?> LookupAsync(string source, string id, string? lang, CancellationToken ct)
     {
         var client = CreateClient();
         var url = $"{BaseUrl}/api/lookup?source={Uri.EscapeDataString(source)}&id={Uri.EscapeDataString(id)}";
+        if (!string.IsNullOrWhiteSpace(lang))
+            url += $"&lang={Uri.EscapeDataString(lang)}";
         try
         {
             var response = await client.GetAsync(url, ct).ConfigureAwait(false);

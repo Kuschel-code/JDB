@@ -35,8 +35,10 @@ public class MetaHubImageProvider : IRemoteImageProvider
 
     public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
     {
-        var work = await MetaHubMapping.ResolveAsync(_client, item.ProviderIds, cancellationToken).ConfigureAwait(false);
-        if (work is null)
+        var config = Plugin.Instance!.Configuration;
+        var work = await MetaHubMapping.ResolveAsync(_client, item.ProviderIds, config.PreferredLanguage, cancellationToken)
+            .ConfigureAwait(false);
+        if (work is null || !MetaHubMapping.IsMediaTypeEnabled(work.MediaType, config))
             return Enumerable.Empty<RemoteImageInfo>();
 
         var images = await _client.GetImagesAsync(work.Id, cancellationToken).ConfigureAwait(false);

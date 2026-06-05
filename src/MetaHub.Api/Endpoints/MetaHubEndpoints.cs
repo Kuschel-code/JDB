@@ -1,10 +1,13 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using MetaHub.Api.Contracts;
+using MetaHub.Api.Scheduling;
 using MetaHub.Domain.Entities;
 using MetaHub.Domain.Enums;
 using MetaHub.Enrichment;
 using MetaHub.Export;
 using MetaHub.Identification;
+using MetaHub.Identification.AniDb;
 using MetaHub.Infrastructure;
 using MetaHub.Ingest.Anime;
 
@@ -24,6 +27,7 @@ public static class MetaHubEndpoints
         api.MapGet("/series/{id:guid}/episodes", GetSeriesEpisodes);
         api.MapGet("/lookup", Lookup);
         api.MapGet("/search", Search);
+        api.MapGet("/config", GetConfig);
         api.MapPost("/identify", Identify);
         api.MapPost("/files/identify", IdentifyFile);
         api.MapGet("/work/{id:guid}/nfo", GetWorkNfo);
@@ -74,7 +78,8 @@ public static class MetaHubEndpoints
         return Results.Ok(episodes);
     }
 
-    private static async Task<IResult> Lookup(string source, string id, MetaHubDbContext db, CancellationToken ct)
+    private static async Task<IResult> Lookup(
+        string source, string id, MetaHubDbContext db, CancellationToken ct, string? lang = null)
     {
         if (!TryParseSource(source, out var src))
             return Results.BadRequest($"Unknown source '{source}'.");
@@ -85,7 +90,7 @@ public static class MetaHubEndpoints
             .FirstOrDefaultAsync(
                 w => w.ExternalIds.Any(x => x.Source == src && x.ExternalValue == id), ct);
 
-        return work is null ? Results.NotFound() : Results.Ok(ToResponse(work));
+        return work is null ? Results.NotFound() : Results.Ok(ToResponse(work, lang));
     }
 
     private static async Task<IResult> Search(
@@ -182,6 +187,55 @@ public static class MetaHubEndpoints
 
     private static EnrichmentWriteMode? ParseWriteMode(string? value)
         => Enum.TryParse<EnrichmentWriteMode>(value, true, out var mode) ? mode : null;
+
+    /// <summary>
+    /// Read-only, sanitized view of the server's effective engine configuration. Secrets
+    /// (passwords, API keys) are reported as booleans only. Used by the Jellyfin plugin's
+    /// "Server" tab so operators can see how the engine is configured without SSH.
+    /// </summary>
+    private static IResult GetConfig(
+        IOptions<EnrichmentOptions> enrichment,
+        IOptions<AniDbOptions> aniDb,
+        IOptions<SchedulerOptions> scheduler,
+        IOptions<AnimeIngestOptions> ingest)
+    {
+        var e = enrichment.Value;
+        var a = aniDb.Value;
+        var s = scheduler.Value;
+        var i = ingest.Value;
+
+        return Results.Ok(new
+        {
+            enrichment = new
+            {
+                writeMode = e.WriteMode.ToString(),
+                preferredLanguage = e.PreferredLanguage,
+                e.TtlFinishedDays,
+                e.TtlOngoingDays,
+                tmdbConfigured = !string.IsNullOrWhiteSpace(e.TmdbApiKey),
+                googleBooksConfigured = !string.IsNullOrWhiteSpace(e.GoogleBooksApiKey)
+            },
+            aniDb = new
+            {
+                a.Enabled,
+                a.MinRequestIntervalSeconds,
+                credentialsConfigured = !string.IsNullOrWhiteSpace(a.Username) && !string.IsNullOrWhiteSpace(a.Password)
+            },
+            scheduler = new
+            {
+                s.Enabled,
+                s.EnrichmentEnabled,
+                s.EnrichmentIntervalMinutes,
+                s.EnrichmentOnlyMissing,
+                s.IngestEnabled,
+                s.IngestIntervalHours,
+                s.ScanEnabled,
+                s.ScanIntervalMinutes,
+                animeLibraryPaths = s.AnimeLibraryPaths.Length
+            },
+            ingest = new { i.ManamiUrl, i.FribbUrl }
+        });
+    }
 
     private static async Task<IResult> GetStats(MetaHubDbContext db, CancellationToken ct)
     {

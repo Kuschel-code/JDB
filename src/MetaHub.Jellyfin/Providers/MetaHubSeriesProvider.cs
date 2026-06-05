@@ -22,8 +22,10 @@ public class MetaHubSeriesProvider : IRemoteMetadataProvider<Series, SeriesInfo>
     public async Task<MetadataResult<Series>> GetMetadata(SeriesInfo info, CancellationToken cancellationToken)
     {
         var result = new MetadataResult<Series>();
-        var work = await MetaHubMapping.ResolveAsync(_client, info.ProviderIds, cancellationToken).ConfigureAwait(false);
-        if (work is null)
+        var config = Plugin.Instance!.Configuration;
+        var work = await MetaHubMapping.ResolveAsync(_client, info.ProviderIds, config.PreferredLanguage, cancellationToken)
+            .ConfigureAwait(false);
+        if (work is null || !MetaHubMapping.IsMediaTypeEnabled(work.MediaType, config))
             return result;
 
         result.HasMetadata = true;

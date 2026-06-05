@@ -53,8 +53,16 @@ src/
 tests/
   MetaHub.Tests           Unit tests (parser + ingest)
 docs/
+  CONFIGURATION.md        Full settings reference (server engine + plugin)
   DATA_SOURCES.md         Curated provider/dataset catalogue
 ```
+
+## Configuration
+
+Settings live in two clearly separated places — the **server engine**
+(`MetaHub.Api/appsettings.json`) and the **Jellyfin plugin** (admin UI, a client of the
+API). See **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** for the full reference,
+defaults, env-var overrides and the ownership model.
 
 ## Quick start
 
@@ -149,6 +157,7 @@ configure it under the `Scheduler` section:
 | GET    | `/api/series/{id}/episodes`            | Episodes of a series/anime                |
 | GET    | `/api/lookup?source=tmdb&id=12345`     | Resolve by external id                    |
 | GET    | `/api/search?type=anime&q=...`         | Title search                              |
+| GET    | `/api/config`                          | Read-only engine config (secrets as bools) |
 | GET    | `/api/work/{id}/nfo`                    | NFO XML for the work (Jellyfin/Kodi)      |
 | POST   | `/api/identify`                        | Resolve an already-identified file by hash/path |
 | POST   | `/api/files/identify`                  | ED2K-hash a local file + AniDB lookup (M3) |
