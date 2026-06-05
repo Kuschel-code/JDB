@@ -178,6 +178,24 @@ configure it under the `Scheduler` section:
 - [x] **M7** Jellyfin metadata/image provider plugin (`MetaHub.Jellyfin`, fetches from the API)
 - [x] **M8** Conflict resolution (priority + write modes), image scoring, i18n (`?lang=`), Serilog + stats
 
+## Jellyfin plugin
+
+Install via the plugin **repository link** (Jellyfin → Dashboard → Plugins → Repositories → **+**):
+
+```
+https://raw.githubusercontent.com/Kuschel-code/JDB/main/manifest.json
+```
+
+Then open **Catalog → Metadata → MetaHub** and install. Configure it under
+**Plugins → MetaHub** (Connection / Library / Server / About) — see
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
+> The link serves [`manifest.json`](manifest.json), which lists installable versions. It is
+> populated automatically by the **Release** workflow: pushing a `v*` tag builds the plugin
+> zip, attaches it to a GitHub Release, and adds the version (with its MD5 checksum) to the
+> manifest. So the link becomes installable once this is merged to `main` and the first
+> release tag is pushed.
+
 ## Tests
 
 ```bash

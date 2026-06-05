@@ -1,0 +1,12 @@
+[
+  {
+    "guid": "a3f1c2d4-5b6e-47a8-9c0d-1e2f3a4b5c6d",
+    "name": "MetaHub",
+    "description": "Aggregated, cross-linked metadata and artwork served from a self-hosted MetaHub instance.",
+    "overview": "Self-hosted media metadata aggregator for Jellyfin (music, movies, series, anime, books).",
+    "owner": "kuschel-code",
+    "category": "Metadata",
+    "imageUrl": "",
+    "versions": []
+  }
+]
