@@ -14,59 +14,47 @@ only then aggregates metadata.
 > Scope: **metadata only**. MetaHub does not index or provide unlicensed
 > streaming/download sources. It identifies files you already own and enriches them.
 
-## Media types
+**Media types:** Music · Movies · Series · Anime · Books
 
-Music · Movies · Series · Anime · Books
+## Two ways to run
 
-## Architecture
+| Mode | What runs | Database | Best for |
+|------|-----------|----------|----------|
+| **Embedded plugin** (default) | Everything inside Jellyfin | local **SQLite** | Most users — no Docker, no server |
+| **Standalone server** | Separate ASP.NET API + workers | **PostgreSQL** or SQLite | Non-Jellyfin clients, multi-app setups |
 
-```
-Local files ─► [0] Identification ─► file ↔ work link (ED2K/AniDB, AcoustID, ISBN, filename/TMDB)
-Mappings    ─► [1] Ingest         ─► master data + cross-IDs (PostgreSQL)
-External    ─► [2] Enrichment     ─► normalized fields + artwork (rate-limited, cached, Polly)
-APIs        ─► [3] Web API        ─► Jellyfin plugin · Web UI · NFO export
-```
+---
 
-## Tech stack
+## Get started — Jellyfin plugin (embedded, no Docker)
 
-| Layer            | Choice                                  |
-|------------------|-----------------------------------------|
-| Runtime          | .NET 8 (LTS)                            |
-| Web API          | ASP.NET Core Minimal APIs              |
-| ORM / DB         | EF Core + PostgreSQL (JSONB)           |
-| HTTP resilience  | `IHttpClientFactory` + Polly           |
-| Logging          | `Microsoft.Extensions.Logging`         |
-| Container        | Docker / docker-compose                |
+The recommended setup. The plugin runs the **whole engine inside Jellyfin** — a local
+SQLite database in the plugin data folder, in-process identification/enrichment, and
+ingest/enrichment exposed as Jellyfin **Scheduled Tasks**. Datasets come from GitHub.
+**No Docker, no separate server, no database to install.**
 
-## Project layout
+1. **Add the repository** (Jellyfin → Dashboard → Plugins → Repositories → **+**):
 
-```
-src/
-  MetaHub.Domain          Entities + enums (the unified data model)
-  MetaHub.Infrastructure  EF Core DbContext, migrations, PostgreSQL mapping
-  MetaHub.Ingest          M2 anime ingest (manami + Fribb) with Polly-backed HTTP
-  MetaHub.Identification  M3 Shoko core: ED2K/MD4/CRC32 hashing + AniDB UDP client
-  MetaHub.Enrichment      M4 enrichment: AniList + Jikan providers, merger, TTL cache
-  MetaHub.Export          M5 NFO export (Jellyfin/Kodi-compatible *.nfo)
-  MetaHub.Api             ASP.NET Core Minimal API
-  MetaHub.Jellyfin        Jellyfin plugin: tabbed admin settings page (M7 head-start)
-tests/
-  MetaHub.Tests           Unit tests (parser + ingest)
-docs/
-  CONFIGURATION.md        Full settings reference (server engine + plugin)
-  DATA_SOURCES.md         Curated provider/dataset catalogue
-```
+   ```
+   https://raw.githubusercontent.com/Kuschel-code/JDB/main/manifest.json
+   ```
 
-## Configuration
+2. **Install** from Catalog → Metadata → **MetaHub**, then restart Jellyfin.
+3. **Configure** under Plugins → MetaHub (**Mode / Library / Engine / About**) — keep
+   *embedded* on; optionally add a TMDB key and AniDB credentials.
+4. **Run the tasks** (Dashboard → Scheduled Tasks): **MetaHub: Update anime mappings**
+   once, then **MetaHub: Enrich metadata**.
 
-Settings live in two clearly separated places — the **server engine**
-(`MetaHub.Api/appsettings.json`) and the **Jellyfin plugin** (admin UI, a client of the
-API). See **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** for the full reference,
-defaults, env-var overrides and the ownership model.
+> The repository link serves [`manifest.json`](manifest.json). The **Release** workflow
+> populates it automatically: pushing a `v*` tag builds the plugin zip, attaches it to a
+> GitHub Release, and adds the version (with MD5 checksum) to the manifest. So the link
+> becomes installable once a release tag has been pushed.
 
-## Quick start
+## Get started — standalone server (optional)
 
-### With Docker (Postgres + API)
+Only needed if you want a shared MetaHub API for non-Jellyfin clients. In this mode the
+Jellyfin plugin becomes a thin client (turn *embedded* off and point it at the API URL).
+
+### Docker (PostgreSQL + API)
 
 ```bash
 docker compose up --build
@@ -76,78 +64,72 @@ docker compose up --build
 ### Local development
 
 ```bash
-# 1. Start a Postgres (or use docker compose up db)
-# 2. Apply migrations + run the API
-dotnet run --project src/MetaHub.Api
+dotnet run --project src/MetaHub.Api    # needs a PostgreSQL (or: docker compose up db)
 ```
 
-The connection string is read from `ConnectionStrings:MetaHub`
-(or the `METAHUB_CONNECTION` env var). Migrations are applied on startup unless
-`MetaHub:AutoMigrate` is set to `false`.
+The connection string is read from `ConnectionStrings:MetaHub` (or `METAHUB_CONNECTION`).
+Migrations are applied on startup unless `MetaHub:AutoMigrate` is `false`. Trigger an
+ingest with `curl -X POST http://localhost:8080/api/admin/ingest/anime`.
 
-### Run the anime ingest (M2)
+---
 
-```bash
-curl -X POST http://localhost:8080/api/admin/ingest/anime
+## Architecture
+
+```
+Local files ─► [0] Identification ─► file ↔ work link (ED2K/AniDB, AcoustID, ISBN, filename/TMDB)
+Mappings    ─► [1] Ingest         ─► master data + cross-IDs   (SQLite embedded / PostgreSQL server)
+External    ─► [2] Enrichment     ─► normalized fields + artwork (rate-limited, cached, Polly)
+APIs        ─► [3] Delivery       ─► Jellyfin plugin (in-process) · Web API · NFO export
 ```
 
-This downloads the [manami-project/anime-offline-database](https://github.com/manami-project/anime-offline-database)
-and [Fribb/anime-lists](https://github.com/Fribb/anime-lists) datasets, creates `Work`
-master records and populates their cross-provider `ExternalId`s. Re-running is idempotent.
+## Tech stack
 
-### Identify a local file (M3, Shoko core)
+| Layer            | Choice                                          |
+|------------------|-------------------------------------------------|
+| Runtime          | .NET 8 (LTS)                                    |
+| Web API          | ASP.NET Core Minimal APIs                       |
+| ORM / DB         | EF Core — SQLite (embedded) or PostgreSQL (server) |
+| HTTP resilience  | `IHttpClientFactory` + Polly                    |
+| Logging          | Serilog (server) / `Microsoft.Extensions.Logging` |
+| Jellyfin         | `IRemoteMetadataProvider` / `IRemoteImageProvider` + Scheduled Tasks |
+| Container        | Docker / docker-compose (server mode only)      |
 
-```bash
-curl -X POST http://localhost:8080/api/files/identify \
-  -H 'Content-Type: application/json' \
-  -d '{"path": "/media/anime/episode.mkv"}'
+## Project layout
+
+```
+src/
+  MetaHub.Domain          Entities + enums (the unified data model)
+  MetaHub.Infrastructure  EF Core DbContext (provider-agnostic: SQLite or PostgreSQL)
+  MetaHub.Ingest          Anime ingest (manami + Fribb) with Polly-backed HTTP
+  MetaHub.Identification  Shoko core: ED2K/MD4/CRC32 hashing + AniDB UDP client + name parser
+  MetaHub.Enrichment      Providers (AniList/Jikan/TMDB/MusicBrainz/OpenLibrary/GoogleBooks) + merger
+  MetaHub.Export          NFO export (Jellyfin/Kodi-compatible *.nfo)
+  MetaHub.Api             ASP.NET Core Minimal API (standalone server mode)
+  MetaHub.Jellyfin        Jellyfin plugin: embedded engine, providers, scheduled tasks, settings UI
+tests/
+  MetaHub.Tests           Unit + SQLite integration tests
+docs/
+  CONFIGURATION.md        Full settings reference (both modes)
+  CONCEPT.md              Design/architecture notes
+  DATA_SOURCES.md         Curated provider/dataset catalogue
 ```
 
-This computes the file's **ED2K** hash (MD4-based) and, if AniDB is enabled, resolves it via
-the AniDB UDP **FILE** command to the exact anime/episode, then links it to the matching
-`Work`. The hash is cached so it is never recomputed.
+## Configuration
 
-### Enrichment write mode
+In **embedded** mode all settings live in the plugin UI (Mode / Library / Engine). In
+**server** mode the engine is configured in `MetaHub.Api/appsettings.json`. Both are
+documented in **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** (defaults, env-var
+overrides, secrets handling).
 
-Enrichment can either **only fill missing fields** (default, never touches existing metadata)
-or **overwrite** with the highest-priority provider value. Set it globally via
-`Enrichment:WriteMode` (`FillMissingOnly` | `Overwrite`) or per request with `?writeMode=`.
-Batch enrichment can also target only works that have no metadata yet via `?onlyMissing=true`.
-Genres and images are always additive (never removed).
+Highlights:
 
-### AniDB
+- **Enrichment write mode** — `FillMissingOnly` (default, never touches existing metadata)
+  or `Overwrite`. Genres and images are always additive.
+- **AniDB** — disabled by default; needs a registered UDP client + account.
+- **Scheduling** — embedded mode uses Jellyfin Scheduled Tasks; server mode has a built-in
+  background scheduler (`Scheduler` section).
 
-AniDB is **disabled by default** and requires a registered UDP client plus account. Enable
-it under the `AniDb` configuration section (respect AniDB's strict rate limits — the client
-serializes requests and waits between packets):
-
-```jsonc
-"AniDb": {
-  "Enabled": true,
-  "ClientName": "yourclient",   // registered AniDB UDP client name
-  "ClientVersion": 1,
-  "Username": "...",
-  "Password": "..."
-}
-```
-
-### Scheduled scan
-
-A built-in background scheduler can periodically refresh the mapping datasets, enrich works,
-and scan library folders to identify new files (ED2K/AniDB). It is **disabled by default**;
-configure it under the `Scheduler` section:
-
-```jsonc
-"Scheduler": {
-  "Enabled": true,
-  "EnrichmentEnabled": true,  "EnrichmentIntervalMinutes": 360, "EnrichmentOnlyMissing": true,
-  "IngestEnabled": false,     "IngestIntervalHours": 168,
-  "ScanEnabled": true,        "ScanIntervalMinutes": 60,
-  "AnimeLibraryPaths": ["/media/anime"]
-}
-```
-
-## API endpoints
+## API endpoints (server mode)
 
 | Method | Route                                  | Purpose                                   |
 |--------|----------------------------------------|-------------------------------------------|
@@ -160,56 +142,24 @@ configure it under the `Scheduler` section:
 | GET    | `/api/config`                          | Read-only engine config (secrets as bools) |
 | GET    | `/api/work/{id}/nfo`                    | NFO XML for the work (Jellyfin/Kodi)      |
 | POST   | `/api/identify`                        | Resolve an already-identified file by hash/path |
-| POST   | `/api/files/identify`                  | ED2K-hash a local file + AniDB lookup (M3) |
+| POST   | `/api/files/identify`                  | ED2K-hash a local file + AniDB lookup     |
 | POST   | `/api/admin/ingest/anime`              | Trigger the anime ingest                  |
-| POST   | `/api/admin/enrich/work/{id}`          | Enrich one work (AniList + Jikan)         |
+| POST   | `/api/admin/enrich/work/{id}`          | Enrich one work                           |
 | POST   | `/api/admin/enrich/anime`              | Batch-enrich anime works (paced)          |
 | POST   | `/api/admin/export/nfo/{id}?dir=...`   | Write an NFO file to a directory          |
 | GET    | `/api/admin/stats`                     | Counts (works by type, files, images, ...) |
 
 ## Roadmap
 
-- [x] **M1** Skeleton: solution, PostgreSQL, EF migrations, `Work`/`ExternalId`/`MediaFile`
+- [x] **M1** Skeleton: solution, EF model, migrations, `Work`/`ExternalId`/`MediaFile`
 - [x] **M2** Anime ingest: manami + Fribb → master data + cross-IDs
 - [x] **M3** Anime identification: ED2K hashing + AniDB file lookup (Shoko core)
 - [x] **M4** Enrichment v1: AniList + Jikan end-to-end (Polly + cache)
-- [x] **M5** API + NFO export, first Jellyfin test
+- [x] **M5** API + NFO export
 - [x] **M6** More media types: movies/series (TMDB), music (MusicBrainz), books (Open Library + Google Books)
-- [x] **M7** Jellyfin metadata/image provider plugin (`MetaHub.Jellyfin`, fetches from the API)
+- [x] **M7** Jellyfin metadata/image provider plugin
 - [x] **M8** Conflict resolution (priority + write modes), image scoring, i18n (`?lang=`), Serilog + stats
-
-## Jellyfin plugin
-
-Install via the plugin **repository link** (Jellyfin → Dashboard → Plugins → Repositories → **+**):
-
-```
-https://raw.githubusercontent.com/Kuschel-code/JDB/main/manifest.json
-```
-
-Then open **Catalog → Metadata → MetaHub** and install.
-
-### Embedded mode — no Docker, no server
-
-By default the plugin runs **fully embedded** inside Jellyfin: a local **SQLite** database in
-the plugin data folder, in-process identification/enrichment, and ingest/enrichment exposed as
-Jellyfin **Scheduled Tasks** (Dashboard → Scheduled Tasks → *MetaHub: Update anime mappings* /
-*MetaHub: Enrich metadata*). Datasets are pulled from GitHub. Nothing else to install.
-
-First run:
-1. Configure the plugin (**Plugins → MetaHub** → Mode / Library / Engine).
-2. Run **MetaHub: Update anime mappings** once, then **MetaHub: Enrich metadata**.
-
-Turn off **embedded** only if you want the plugin to talk to a separate MetaHub server (the
-ASP.NET API / Docker setup below) instead. See [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
-
-> The standalone server (ASP.NET API + PostgreSQL, or a self-contained binary with SQLite)
-> remains available for non-Jellyfin clients, but is **not required** for the plugin.
-
-> The link serves [`manifest.json`](manifest.json), which lists installable versions. It is
-> populated automatically by the **Release** workflow: pushing a `v*` tag builds the plugin
-> zip, attaches it to a GitHub Release, and adds the version (with its MD5 checksum) to the
-> manifest. So the link becomes installable once this is merged to `main` and the first
-> release tag is pushed.
+- [x] **Embedded mode** — full engine inside Jellyfin (SQLite), no Docker/server
 
 ## Tests
 
@@ -221,4 +171,4 @@ dotnet test
 
 For personal use. Respect each provider's ToS and rate limits (User-Agent + contact
 where required, e.g. MusicBrainz/AniDB). Cache aggressively; do not re-host aggregated
-data or images publicly. See the concept document for details.
+data or images publicly. See [docs/CONCEPT.md](docs/CONCEPT.md) for details.
