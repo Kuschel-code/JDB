@@ -46,6 +46,7 @@ src/
   MetaHub.Infrastructure  EF Core DbContext, migrations, PostgreSQL mapping
   MetaHub.Ingest          M2 anime ingest (manami + Fribb) with Polly-backed HTTP
   MetaHub.Identification  M3 Shoko core: ED2K/MD4/CRC32 hashing + AniDB UDP client
+  MetaHub.Enrichment      M4 enrichment: AniList + Jikan providers, merger, TTL cache
   MetaHub.Api             ASP.NET Core Minimal API
   MetaHub.Jellyfin        Jellyfin plugin: tabbed admin settings page (M7 head-start)
 tests/
@@ -124,13 +125,15 @@ serializes requests and waits between packets):
 | POST   | `/api/identify`                        | Resolve an already-identified file by hash/path |
 | POST   | `/api/files/identify`                  | ED2K-hash a local file + AniDB lookup (M3) |
 | POST   | `/api/admin/ingest/anime`              | Trigger the anime ingest                  |
+| POST   | `/api/admin/enrich/work/{id}`          | Enrich one work (AniList + Jikan)         |
+| POST   | `/api/admin/enrich/anime`              | Batch-enrich anime works (paced)          |
 
 ## Roadmap
 
 - [x] **M1** Skeleton: solution, PostgreSQL, EF migrations, `Work`/`ExternalId`/`MediaFile`
 - [x] **M2** Anime ingest: manami + Fribb → master data + cross-IDs
 - [x] **M3** Anime identification: ED2K hashing + AniDB file lookup (Shoko core)
-- [ ] **M4** Enrichment v1: AniList + Jikan end-to-end (Polly + cache)
+- [x] **M4** Enrichment v1: AniList + Jikan end-to-end (Polly + cache)
 - [ ] **M5** API + NFO export, first Jellyfin test
 - [ ] **M6** More media types: movies/series, music, books
 - [ ] **M7** Jellyfin metadata/image provider plugin _(settings page started in `MetaHub.Jellyfin`)_

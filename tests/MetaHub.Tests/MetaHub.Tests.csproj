@@ -29,6 +29,7 @@
     <ProjectReference Include="..\..\src\MetaHub.Infrastructure\MetaHub.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\MetaHub.Ingest\MetaHub.Ingest.csproj" />
     <ProjectReference Include="..\..\src\MetaHub.Identification\MetaHub.Identification.csproj" />
+    <ProjectReference Include="..\..\src\MetaHub.Enrichment\MetaHub.Enrichment.csproj" />
   </ItemGroup>
 
 </Project>

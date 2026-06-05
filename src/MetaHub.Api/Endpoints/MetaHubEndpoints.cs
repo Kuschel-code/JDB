@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using MetaHub.Api.Contracts;
 using MetaHub.Domain.Entities;
 using MetaHub.Domain.Enums;
+using MetaHub.Enrichment;
 using MetaHub.Identification;
 using MetaHub.Infrastructure;
 using MetaHub.Ingest.Anime;
@@ -28,6 +29,8 @@ public static class MetaHubEndpoints
         // Admin / operational endpoints.
         var admin = app.MapGroup("/api/admin");
         admin.MapPost("/ingest/anime", RunAnimeIngest);
+        admin.MapPost("/enrich/work/{id:guid}", EnrichWork);
+        admin.MapPost("/enrich/anime", EnrichAnime);
     }
 
     private static async Task<IResult> GetWork(Guid id, MetaHubDbContext db, CancellationToken ct)
@@ -153,6 +156,22 @@ public static class MetaHubEndpoints
             manami = new { manami.Created, manami.Updated, manami.ExternalIdsAdded, manami.Skipped },
             fribb = new { fribb.Updated, fribb.ExternalIdsAdded, fribb.Skipped }
         });
+    }
+
+    private static async Task<IResult> EnrichWork(
+        Guid id, bool? force, EnrichmentService service, CancellationToken ct)
+    {
+        var result = await service.EnrichAsync(id, force ?? false, ct);
+        return result.Found
+            ? Results.Ok(new { result.WorkId, result.Applied, result.Misses })
+            : Results.NotFound();
+    }
+
+    private static async Task<IResult> EnrichAnime(
+        EnrichmentRunner runner, CancellationToken ct, int max = 100, int delayMs = 1000, bool force = false)
+    {
+        var enriched = await runner.EnrichAnimeAsync(max, delayMs, force, ct);
+        return Results.Ok(new { enriched });
     }
 
     private static WorkResponse ToResponse(Work w) => new(
