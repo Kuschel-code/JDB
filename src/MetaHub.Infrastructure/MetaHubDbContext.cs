@@ -210,5 +210,24 @@ public class MetaHubDbContext : DbContext
             e.Property(x => x.Source).HasConversion(sourceConverter);
             e.HasIndex(x => x.Source).IsUnique();
         });
+
+        // SQLite (embedded mode) stores DateTimeOffset as TEXT and cannot translate ORDER BY
+        // or comparisons on it ("SQLite does not support expressions of type 'DateTimeOffset'
+        // in ORDER BY clauses"). Persist every DateTimeOffset as a sortable long so enrichment
+        // queries (e.g. ordering works by UpdatedAt) behave identically to PostgreSQL.
+        if (!useJsonb)
+        {
+            var dateTimeOffsetConverter = new DateTimeOffsetToBinaryConverter();
+            foreach (var entityType in b.Model.GetEntityTypes())
+            {
+                foreach (var property in entityType.GetProperties())
+                {
+                    if (property.ClrType == typeof(DateTimeOffset) || property.ClrType == typeof(DateTimeOffset?))
+                    {
+                        property.SetValueConverter(dateTimeOffsetConverter);
+                    }
+                }
+            }
+        }
     }
 }
