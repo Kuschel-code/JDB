@@ -2,6 +2,10 @@
 
 **Jellyfin Meta DB** — a self-hosted media metadata aggregator (.NET / C#).
 
+[![CI](https://github.com/Kuschel-code/JDB/actions/workflows/ci.yml/badge.svg)](https://github.com/Kuschel-code/JDB/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Kuschel-code/JDB?sort=semver)](https://github.com/Kuschel-code/JDB/releases/latest)
+[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
+
 MetaHub builds a single canonical, unified view per media item by combining several
 official providers, cross-linking them by ID and caching everything locally — so
 Jellyfin (and other clients) get consistent, rich metadata and artwork without hammering
@@ -44,20 +48,15 @@ ingest/enrichment exposed as Jellyfin **Scheduled Tasks**. Datasets come from Gi
 4. **Run the tasks** (Dashboard → Scheduled Tasks): **MetaHub: Update anime mappings**
    once, then **MetaHub: Enrich metadata**.
 
-> The repository link serves [`manifest.json`](manifest.json). The **Release** workflow
-> populates it automatically and adds the version (with MD5 checksum) to the manifest, so the
-> link becomes installable once a release exists.
-
-### Cutting a release
-
-Either push a tag (`git tag v0.1.0 && git push origin v0.1.0`) **or** run it from the UI:
-**Actions → Release → Run workflow**, enter `v0.1.0`. The workflow then creates the tag +
-GitHub Release, builds the runtime zips and the plugin zip, and updates `manifest.json`.
+That's it — Jellyfin now pulls metadata and artwork from your local MetaHub.
 
 ## Get started — standalone server (optional)
 
 Only needed if you want a shared MetaHub API for non-Jellyfin clients. In this mode the
 Jellyfin plugin becomes a thin client (turn *embedded* off and point it at the API URL).
+
+**Download** a self-contained build (no .NET install needed) for your platform from the
+[latest release](https://github.com/Kuschel-code/JDB/releases/latest), or run from source:
 
 ### Docker (PostgreSQL + API)
 
@@ -66,7 +65,7 @@ docker compose up --build
 # API on http://localhost:8080  (Swagger UI at /swagger)
 ```
 
-### Local development
+### From source
 
 ```bash
 dotnet run --project src/MetaHub.Api    # needs a PostgreSQL (or: docker compose up db)
@@ -166,11 +165,18 @@ Highlights:
 - [x] **M8** Conflict resolution (priority + write modes), image scoring, i18n (`?lang=`), Serilog + stats
 - [x] **Embedded mode** — full engine inside Jellyfin (SQLite), no Docker/server
 
-## Tests
+## Development
 
 ```bash
-dotnet test
+dotnet build      # build all projects
+dotnet test       # unit + SQLite integration tests
 ```
+
+**Cutting a release:** push a tag (`git tag v0.1.0 && git push origin v0.1.0`) **or** run it
+from the UI — **Actions → Release → Run workflow**, enter the version. The workflow creates the
+tag + GitHub Release, builds the runtime zips and the Jellyfin plugin zip, and updates
+[`manifest.json`](manifest.json) (with the plugin zip's MD5) so the plugin repository link
+serves the new version automatically.
 
 ## Legal
 
