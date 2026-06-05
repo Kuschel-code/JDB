@@ -1,5 +1,23 @@
 # Configuration reference
 
+## Deployment modes
+
+MetaHub runs in one of two modes, chosen in the plugin (**Plugins → MetaHub → Mode**):
+
+- **Embedded (default, no Docker):** the Jellyfin plugin *is* the engine. It uses a local
+  **SQLite** database (`<jellyfin-data>/metahub/metahub.db`), runs identification/enrichment
+  in-process, and exposes ingest/enrichment as Jellyfin Scheduled Tasks. In this mode the
+  engine settings below live in the **plugin configuration**, not in `appsettings.json`.
+- **Remote/server:** a standalone MetaHub server (ASP.NET API + PostgreSQL, or a self-contained
+  binary with SQLite) runs the engine, and the plugin is a thin client. Engine settings live in
+  the server's `appsettings.json`.
+
+The tables below describe the server `appsettings.json`. In embedded mode the same concepts are
+configured from the plugin's **Library** and **Engine** tabs (TMDB/Google Books keys, write
+mode, preferred language, AniDB credentials).
+
+---
+
 MetaHub has **two configuration surfaces**, separated by ownership:
 
 | Surface | Where | Owns | Edited by |

@@ -37,7 +37,10 @@ public class MetaHubDbContext : DbContext
     {
         base.OnModelCreating(b);
 
-        // Serialize string-keyed dictionaries to JSONB and back.
+        // PostgreSQL stores JSON columns as jsonb; SQLite (embedded mode) stores them as TEXT.
+        var useJsonb = Database.IsNpgsql();
+
+        // Serialize string-keyed dictionaries to JSON text and back.
         var dictConverter = new ValueConverter<Dictionary<string, string>, string>(
             v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
             v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, (JsonSerializerOptions?)null)
@@ -61,10 +64,10 @@ public class MetaHubDbContext : DbContext
             e.Property(x => x.MediaType).HasConversion<string>();
             e.Property(x => x.Status).HasConversion<string>();
             e.Property(x => x.CanonicalTitle).IsRequired();
-            e.Property(x => x.OverviewTranslations)
-                .HasConversion(dictConverter)
-                .Metadata.SetValueComparer(dictComparer);
-            e.Property(x => x.OverviewTranslations).HasColumnType("jsonb");
+            var ot = e.Property(x => x.OverviewTranslations);
+            ot.HasConversion(dictConverter);
+            ot.Metadata.SetValueComparer(dictComparer);
+            if (useJsonb) ot.HasColumnType("jsonb");
             e.HasIndex(x => x.MediaType);
             e.HasIndex(x => x.CanonicalTitle);
         });
@@ -86,10 +89,10 @@ public class MetaHubDbContext : DbContext
         {
             e.ToTable("people");
             e.HasKey(x => x.Id);
-            e.Property(x => x.Bios)
-                .HasConversion(dictConverter)
-                .Metadata.SetValueComparer(dictComparer);
-            e.Property(x => x.Bios).HasColumnType("jsonb");
+            var bios = e.Property(x => x.Bios);
+            bios.HasConversion(dictConverter);
+            bios.Metadata.SetValueComparer(dictComparer);
+            if (useJsonb) bios.HasColumnType("jsonb");
             e.HasIndex(x => x.Name);
         });
 
@@ -194,7 +197,7 @@ public class MetaHubDbContext : DbContext
             e.ToTable("raw_payloads");
             e.HasKey(x => x.Id);
             e.Property(x => x.Source).HasConversion(sourceConverter);
-            e.Property(x => x.Body).HasColumnType("jsonb");
+            if (useJsonb) e.Property(x => x.Body).HasColumnType("jsonb");
             e.HasOne(x => x.Work).WithMany(w => w.RawPayloads)
                 .HasForeignKey(x => x.WorkId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => new { x.WorkId, x.Source });

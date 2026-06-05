@@ -19,4 +19,13 @@
     <EmbeddedResource Include="Configuration\configPage.html" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\MetaHub.Domain\MetaHub.Domain.csproj" />
+    <ProjectReference Include="..\MetaHub.Infrastructure\MetaHub.Infrastructure.csproj" />
+    <ProjectReference Include="..\MetaHub.Ingest\MetaHub.Ingest.csproj" />
+    <ProjectReference Include="..\MetaHub.Identification\MetaHub.Identification.csproj" />
+    <ProjectReference Include="..\MetaHub.Enrichment\MetaHub.Enrichment.csproj" />
+    <ProjectReference Include="..\MetaHub.Export\MetaHub.Export.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -14,6 +14,6 @@ category: "Metadata"
 artifacts:
   - "MetaHub.Jellyfin.dll"
 changelog: >
-  0.1.0.0 - Metadata/image providers backed by the MetaHub API, with a tabbed settings
-  page (Connection / Library / Server / About). Engine settings stay on the server and are
-  shown read-only via /api/config.
+  0.1.0.0 - Embedded engine: runs fully inside Jellyfin with a local SQLite database, no
+  Docker or server required. Ingest/enrichment as Jellyfin Scheduled Tasks; metadata/image
+  providers for movies, series and anime. Optional remote-server mode.

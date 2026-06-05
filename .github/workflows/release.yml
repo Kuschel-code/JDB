@@ -63,11 +63,17 @@ jobs:
 
       - name: Package plugin zip
         run: |
-          mkdir -p artifacts
-          cp src/MetaHub.Jellyfin/build.yaml publish/jellyfin-plugin/ || true
-          zip -r -j "artifacts/metahub-jellyfin-plugin-${{ github.ref_name }}.zip" \
-            "publish/jellyfin-plugin/MetaHub.Jellyfin.dll" \
-            "publish/jellyfin-plugin/build.yaml"
+          mkdir -p artifacts staging
+          cp src/MetaHub.Jellyfin/build.yaml staging/
+          # Bundle MetaHub assemblies + the third-party deps Jellyfin does NOT ship.
+          # EF Core, SQLite and the Microsoft.Extensions.* contracts come from the host
+          # (bundling them would cause cross-boundary type conflicts).
+          for f in MetaHub.*.dll \
+                   Npgsql.dll Npgsql.EntityFrameworkCore.PostgreSQL.dll \
+                   Polly.dll Polly.Extensions.Http.dll Microsoft.Extensions.Http.Polly.dll; do
+            cp publish/jellyfin-plugin/$f staging/ 2>/dev/null || true
+          done
+          ( cd staging && zip -r "../artifacts/metahub-jellyfin-plugin-${{ github.ref_name }}.zip" . )
 
       - name: Upload plugin artifact
         uses: actions/upload-artifact@v4
@@ -89,3 +95,61 @@ jobs:
         with:
           files: artifacts/**/*.zip
           generate_release_notes: true
+
+  manifest:
+    # Updates the Jellyfin plugin repository manifest so the stable repo link
+    # (raw .../main/manifest.json) offers the new version.
+    needs: [plugin, release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Download plugin artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: metahub-jellyfin-plugin
+          path: dist
+
+      - name: Update manifest.json
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          ZIP=$(ls dist/*.zip | head -n1)
+          CHECKSUM=$(md5sum "$ZIP" | awk '{print $1}')
+          VERSION="${TAG#v}"
+          # Jellyfin expects a 4-part version (x.y.z -> x.y.z.0).
+          if [ "$(echo "$VERSION" | grep -o '\.' | wc -l)" -eq 2 ]; then VERSION="${VERSION}.0"; fi
+          SOURCE_URL="https://github.com/${REPO}/releases/download/${TAG}/$(basename "$ZIP")"
+          TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          ENTRY=$(jq -n \
+            --arg version "$VERSION" \
+            --arg changelog "Release $TAG" \
+            --arg targetAbi "10.10.0.0" \
+            --arg sourceUrl "$SOURCE_URL" \
+            --arg checksum "$CHECKSUM" \
+            --arg timestamp "$TS" \
+            '{version:$version, changelog:$changelog, targetAbi:$targetAbi, sourceUrl:$sourceUrl, checksum:$checksum, timestamp:$timestamp}')
+
+          # Prepend the new version (newest first), replacing any existing entry for it.
+          jq --argjson entry "$ENTRY" \
+            '.[0].versions = ([$entry] + (.[0].versions | map(select(.version != $entry.version))))' \
+            manifest.json > manifest.tmp && mv manifest.tmp manifest.json
+          cat manifest.json
+
+      - name: Commit manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "Update plugin manifest for ${{ github.ref_name }}" || echo "no changes"
+          git push origin HEAD:main
+
+      - name: Attach manifest to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: manifest.json
