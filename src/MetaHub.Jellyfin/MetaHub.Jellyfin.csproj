@@ -1,18 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>MetaHub.Jellyfin</RootNamespace>
     <AssemblyName>MetaHub.Jellyfin</AssemblyName>
     <!-- Plugin assembly version (also referenced from build.yaml). -->
-    <Version>0.1.0.0</Version>
+    <Version>0.1.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- Provided by the Jellyfin host at runtime; do not copy locally. -->
-    <PackageReference Include="Jellyfin.Controller" Version="10.10.3" />
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.10" />
   </ItemGroup>
 
   <ItemGroup>
