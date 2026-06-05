@@ -34,16 +34,17 @@ public static class MetaHubEndpoints
         admin.MapPost("/enrich/work/{id:guid}", EnrichWork);
         admin.MapPost("/enrich/anime", EnrichAnime);
         admin.MapPost("/export/nfo/{id:guid}", ExportNfo);
+        admin.MapGet("/stats", GetStats);
     }
 
-    private static async Task<IResult> GetWork(Guid id, MetaHubDbContext db, CancellationToken ct)
+    private static async Task<IResult> GetWork(Guid id, MetaHubDbContext db, CancellationToken ct, string? lang = null)
     {
         var work = await db.Works
             .Include(w => w.ExternalIds)
             .AsNoTracking()
             .FirstOrDefaultAsync(w => w.Id == id, ct);
 
-        return work is null ? Results.NotFound() : Results.Ok(ToResponse(work));
+        return work is null ? Results.NotFound() : Results.Ok(ToResponse(work, lang));
     }
 
     private static async Task<IResult> GetWorkImages(Guid id, string? type, MetaHubDbContext db, CancellationToken ct)
@@ -105,7 +106,7 @@ public static class MetaHubEndpoints
             .Take(Math.Clamp(limit, 1, 100))
             .ToListAsync(ct);
 
-        return Results.Ok(works.Select(ToResponse));
+        return Results.Ok(works.Select(w => ToResponse(w)));
     }
 
     private static async Task<IResult> Identify(
@@ -182,6 +183,25 @@ public static class MetaHubEndpoints
     private static EnrichmentWriteMode? ParseWriteMode(string? value)
         => Enum.TryParse<EnrichmentWriteMode>(value, true, out var mode) ? mode : null;
 
+    private static async Task<IResult> GetStats(MetaHubDbContext db, CancellationToken ct)
+    {
+        var byType = await db.Works
+            .GroupBy(w => w.MediaType)
+            .Select(g => new { Type = g.Key.ToString(), Count = g.Count() })
+            .ToListAsync(ct);
+
+        return Results.Ok(new
+        {
+            works = await db.Works.CountAsync(ct),
+            worksByType = byType,
+            externalIds = await db.ExternalIds.CountAsync(ct),
+            mediaFiles = await db.MediaFiles.CountAsync(ct),
+            identifiedFiles = await db.MediaFiles.CountAsync(f => f.WorkId != null, ct),
+            images = await db.Images.CountAsync(ct),
+            rawPayloads = await db.RawPayloads.CountAsync(ct)
+        });
+    }
+
     private static async Task<IResult> GetWorkNfo(Guid id, NfoExportService export, CancellationToken ct)
     {
         var doc = await export.BuildAsync(id, ct);
@@ -198,9 +218,19 @@ public static class MetaHubEndpoints
         return path is null ? Results.NotFound() : Results.Ok(new { path });
     }
 
-    private static WorkResponse ToResponse(Work w) => new(
-        w.Id, w.MediaType, w.CanonicalTitle, w.OriginalTitle, w.ReleaseYear, w.Overview, w.Status,
-        w.ExternalIds.Select(x => new ExternalIdResponse(x.Source.ToString(), x.ExternalValue)).ToList());
+    private static WorkResponse ToResponse(Work w, string? lang = null)
+    {
+        // Prefer a localized overview when the requested language is available.
+        var overview = w.Overview;
+        if (!string.IsNullOrWhiteSpace(lang) &&
+            w.OverviewTranslations.TryGetValue(lang, out var localized) &&
+            !string.IsNullOrWhiteSpace(localized))
+            overview = localized;
+
+        return new WorkResponse(
+            w.Id, w.MediaType, w.CanonicalTitle, w.OriginalTitle, w.ReleaseYear, overview, w.Status,
+            w.ExternalIds.Select(x => new ExternalIdResponse(x.Source.ToString(), x.ExternalValue)).ToList());
+    }
 
     private static bool TryParseSource(string source, out ExternalIdSource parsed)
     {

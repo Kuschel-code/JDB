@@ -144,7 +144,7 @@ configure it under the `Scheduler` section:
 | Method | Route                                  | Purpose                                   |
 |--------|----------------------------------------|-------------------------------------------|
 | GET    | `/health`                              | Liveness                                  |
-| GET    | `/api/work/{id}`                       | Canonical record                          |
+| GET    | `/api/work/{id}?lang=de`               | Canonical record (localized overview)     |
 | GET    | `/api/work/{id}/images?type=poster`    | Artwork for a work                        |
 | GET    | `/api/series/{id}/episodes`            | Episodes of a series/anime                |
 | GET    | `/api/lookup?source=tmdb&id=12345`     | Resolve by external id                    |
@@ -156,6 +156,7 @@ configure it under the `Scheduler` section:
 | POST   | `/api/admin/enrich/work/{id}`          | Enrich one work (AniList + Jikan)         |
 | POST   | `/api/admin/enrich/anime`              | Batch-enrich anime works (paced)          |
 | POST   | `/api/admin/export/nfo/{id}?dir=...`   | Write an NFO file to a directory          |
+| GET    | `/api/admin/stats`                     | Counts (works by type, files, images, ...) |
 
 ## Roadmap
 
@@ -166,7 +167,7 @@ configure it under the `Scheduler` section:
 - [x] **M5** API + NFO export, first Jellyfin test
 - [x] **M6** More media types: movies/series (TMDB), music (MusicBrainz), books (Open Library + Google Books)
 - [x] **M7** Jellyfin metadata/image provider plugin (`MetaHub.Jellyfin`, fetches from the API)
-- [ ] **M8** Conflict resolution, image scoring, i18n, monitoring
+- [x] **M8** Conflict resolution (priority + write modes), image scoring, i18n (`?lang=`), Serilog + stats
 
 ## Tests
 

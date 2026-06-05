@@ -6,8 +6,16 @@ using MetaHub.Export;
 using MetaHub.Identification;
 using MetaHub.Infrastructure;
 using MetaHub.Ingest;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Structured logging (Serilog), read from configuration with a sensible console default.
+builder.Host.UseSerilog((context, services, config) => config
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .WriteTo.Console());
 
 var connectionString = builder.Configuration.GetConnectionString("MetaHub")
     ?? Environment.GetEnvironmentVariable("METAHUB_CONNECTION")
@@ -34,6 +42,8 @@ if (app.Configuration.GetValue("MetaHub:AutoMigrate", true))
     var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
     db.Database.Migrate();
 }
+
+app.UseSerilogRequestLogging();
 
 app.UseSwagger();
 app.UseSwaggerUI();

@@ -93,7 +93,8 @@ public class EnrichmentService
 
         if (collected.Count > 0)
         {
-            await new WorkMerger(_db).ApplyAsync(work, collected, writeMode ?? _options.WriteMode, ct);
+            await new WorkMerger(_db).ApplyAsync(
+                work, collected, writeMode ?? _options.WriteMode, _options.PreferredLanguage, ct);
             await _db.SaveChangesAsync(ct);
         }
 

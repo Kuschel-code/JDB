@@ -26,6 +26,7 @@ public class WorkMerger
         Work work,
         IReadOnlyList<NormalizedWorkData> ordered,
         EnrichmentWriteMode writeMode = EnrichmentWriteMode.Overwrite,
+        string? preferredLanguage = null,
         CancellationToken ct = default)
     {
         if (ordered.Count == 0)
@@ -56,7 +57,7 @@ public class WorkMerger
 
         await ApplyDetailAsync(work, ordered, writeMode, ct);
         await ApplyGenresAsync(work, ordered, ct);
-        ApplyImages(work, ordered);
+        ApplyImages(work, ordered, preferredLanguage);
     }
 
     private async Task ApplyDetailAsync(
@@ -179,7 +180,7 @@ public class WorkMerger
         }
     }
 
-    private void ApplyImages(Work work, IReadOnlyList<NormalizedWorkData> ordered)
+    private void ApplyImages(Work work, IReadOnlyList<NormalizedWorkData> ordered, string? preferredLanguage)
     {
         var existingUrls = work.Images.Select(i => i.Url).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -197,7 +198,7 @@ public class WorkMerger
                 Width = image.Width,
                 Height = image.Height,
                 Source = image.Source,
-                Score = image.Score
+                Score = ImageScorer.Score(image, preferredLanguage)
             };
             // Add via the set so EF tracks it as Added even though its client-generated key is set.
             _db.Images.Add(entity);
