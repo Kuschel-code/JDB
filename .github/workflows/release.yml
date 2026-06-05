@@ -1,17 +1,41 @@
 name: Release
 
-# Builds self-contained zips for each runtime and attaches them to a GitHub Release
-# whenever a version tag (e.g. v0.1.0) is pushed.
+# Builds self-contained zips for each runtime + the Jellyfin plugin zip, attaches them to a
+# GitHub Release, and updates the plugin repository manifest.
+#
+# Triggers:
+#  - push of a version tag (e.g. v0.1.0), or
+#  - manual run ("Run workflow") with a version input — handy when you cannot push tags
+#    locally; the workflow creates the tag/release itself.
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag to release (e.g. v0.1.0)"
+        required: true
 
 permissions:
   contents: write
 
 jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: setup
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -37,7 +61,7 @@ jobs:
       - name: Package zip
         run: |
           mkdir -p artifacts
-          zip -r -j "artifacts/metahub-${{ github.ref_name }}-${{ matrix.rid }}.zip" "publish/${{ matrix.rid }}"
+          zip -r -j "artifacts/metahub-${{ needs.setup.outputs.version }}-${{ matrix.rid }}.zip" "publish/${{ matrix.rid }}"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -46,6 +70,7 @@ jobs:
           path: artifacts/*.zip
 
   plugin:
+    needs: setup
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -73,7 +98,7 @@ jobs:
                    Polly.dll Polly.Extensions.Http.dll Microsoft.Extensions.Http.Polly.dll; do
             cp publish/jellyfin-plugin/$f staging/ 2>/dev/null || true
           done
-          ( cd staging && zip -r "../artifacts/metahub-jellyfin-plugin-${{ github.ref_name }}.zip" . )
+          ( cd staging && zip -r "../artifacts/metahub-jellyfin-plugin-${{ needs.setup.outputs.version }}.zip" . )
 
       - name: Upload plugin artifact
         uses: actions/upload-artifact@v4
@@ -82,7 +107,7 @@ jobs:
           path: artifacts/*.zip
 
   release:
-    needs: [build, plugin]
+    needs: [setup, build, plugin]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -93,13 +118,16 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.setup.outputs.version }}
+          target_commitish: main
+          name: ${{ needs.setup.outputs.version }}
           files: artifacts/**/*.zip
           generate_release_notes: true
 
   manifest:
     # Updates the Jellyfin plugin repository manifest so the stable repo link
     # (raw .../main/manifest.json) offers the new version.
-    needs: [plugin, release]
+    needs: [setup, plugin, release]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout default branch
@@ -115,7 +143,7 @@ jobs:
 
       - name: Update manifest.json
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ needs.setup.outputs.version }}
           REPO: ${{ github.repository }}
         run: |
           ZIP=$(ls dist/*.zip | head -n1)
@@ -146,10 +174,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add manifest.json
-          git commit -m "Update plugin manifest for ${{ github.ref_name }}" || echo "no changes"
+          git commit -m "Update plugin manifest for ${{ needs.setup.outputs.version }}" || echo "no changes"
           git push origin HEAD:main
 
       - name: Attach manifest to release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.setup.outputs.version }}
           files: manifest.json
