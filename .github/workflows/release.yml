@@ -46,7 +46,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "9.0.x"
 
       - name: Publish API (${{ matrix.rid }})
         run: |
@@ -78,7 +78,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "9.0.x"
 
       - name: Build Jellyfin plugin
         run: |
@@ -157,7 +157,7 @@ jobs:
           ENTRY=$(jq -n \
             --arg version "$VERSION" \
             --arg changelog "Release $TAG" \
-            --arg targetAbi "10.10.0.0" \
+            --arg targetAbi "10.11.0.0" \
             --arg sourceUrl "$SOURCE_URL" \
             --arg checksum "$CHECKSUM" \
             --arg timestamp "$TS" \

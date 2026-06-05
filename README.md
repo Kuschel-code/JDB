@@ -4,7 +4,8 @@
 
 [![CI](https://github.com/Kuschel-code/JDB/actions/workflows/ci.yml/badge.svg)](https://github.com/Kuschel-code/JDB/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Kuschel-code/JDB?sort=semver)](https://github.com/Kuschel-code/JDB/releases/latest)
-[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/)
+[![Jellyfin](https://img.shields.io/badge/Jellyfin-10.11-00A4DC)](https://jellyfin.org/)
 
 MetaHub builds a single canonical, unified view per media item by combining several
 official providers, cross-linking them by ID and caching everything locally — so
@@ -90,7 +91,7 @@ APIs        ─► [3] Delivery       ─► Jellyfin plugin (in-process) · Web
 
 | Layer            | Choice                                          |
 |------------------|-------------------------------------------------|
-| Runtime          | .NET 8 (LTS)                                    |
+| Runtime          | .NET 9 (matches Jellyfin 10.11)                 |
 | Web API          | ASP.NET Core Minimal APIs                       |
 | ORM / DB         | EF Core — SQLite (embedded) or PostgreSQL (server) |
 | HTTP resilience  | `IHttpClientFactory` + Polly                    |
