@@ -1,0 +1,57 @@
+using Microsoft.EntityFrameworkCore;
+using MetaHub.Api.Endpoints;
+using MetaHub.Api.Scheduling;
+using MetaHub.Enrichment;
+using MetaHub.Export;
+using MetaHub.Identification;
+using MetaHub.Infrastructure;
+using MetaHub.Ingest;
+using Serilog;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Structured logging (Serilog), read from configuration with a sensible console default.
+builder.Host.UseSerilog((context, services, config) => config
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .WriteTo.Console());
+
+var connectionString = builder.Configuration.GetConnectionString("MetaHub")
+    ?? Environment.GetEnvironmentVariable("METAHUB_CONNECTION")
+    ?? "Host=localhost;Port=5432;Database=metahub;Username=metahub;Password=metahub";
+
+builder.Services.AddMetaHubInfrastructure(connectionString);
+builder.Services.AddAnimeIngest();
+builder.Services.AddIdentification();
+builder.Services.AddEnrichment();
+builder.Services.AddNfoExport();
+
+builder.Services.AddOptions<SchedulerOptions>().BindConfiguration(SchedulerOptions.SectionName);
+builder.Services.AddHostedService<ScheduledScanService>();
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+var app = builder.Build();
+
+// Apply EF migrations on startup unless explicitly disabled (handy for the docker-compose setup).
+if (app.Configuration.GetValue("MetaHub:AutoMigrate", true))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+    db.Database.Migrate();
+}
+
+app.UseSerilogRequestLogging();
+
+app.UseSwagger();
+app.UseSwaggerUI();
+
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapMetaHubEndpoints();
+
+app.Run();
+
+/// <summary>Exposed so integration tests can reference the API host.</summary>
+public partial class Program;
