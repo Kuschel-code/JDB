@@ -5,16 +5,16 @@ using MetaHub.Jellyfin.Api;
 
 namespace MetaHub.Jellyfin.Providers;
 
-/// <summary>Series/anime metadata provider backed by the MetaHub API.</summary>
+/// <summary>Series/anime metadata provider, backed by the embedded engine or a remote API.</summary>
 public class MetaHubSeriesProvider : IRemoteMetadataProvider<Series, SeriesInfo>
 {
+    private readonly IMetaHubBackend _backend;
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly MetaHubApiClient _client;
 
-    public MetaHubSeriesProvider(IHttpClientFactory httpClientFactory)
+    public MetaHubSeriesProvider(IMetaHubBackend backend, IHttpClientFactory httpClientFactory)
     {
+        _backend = backend;
         _httpClientFactory = httpClientFactory;
-        _client = new MetaHubApiClient(httpClientFactory);
     }
 
     public string Name => "MetaHub";
@@ -23,7 +23,7 @@ public class MetaHubSeriesProvider : IRemoteMetadataProvider<Series, SeriesInfo>
     {
         var result = new MetadataResult<Series>();
         var config = Plugin.Instance!.Configuration;
-        var work = await MetaHubMapping.ResolveAsync(_client, info.ProviderIds, config.PreferredLanguage, cancellationToken)
+        var work = await _backend.ResolveAsync(info.ProviderIds, config.PreferredLanguage, cancellationToken)
             .ConfigureAwait(false);
         if (work is null || !MetaHubMapping.IsMediaTypeEnabled(work.MediaType, config))
             return result;

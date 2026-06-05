@@ -186,9 +186,24 @@ Install via the plugin **repository link** (Jellyfin → Dashboard → Plugins �
 https://raw.githubusercontent.com/Kuschel-code/JDB/main/manifest.json
 ```
 
-Then open **Catalog → Metadata → MetaHub** and install. Configure it under
-**Plugins → MetaHub** (Connection / Library / Server / About) — see
-[docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+Then open **Catalog → Metadata → MetaHub** and install.
+
+### Embedded mode — no Docker, no server
+
+By default the plugin runs **fully embedded** inside Jellyfin: a local **SQLite** database in
+the plugin data folder, in-process identification/enrichment, and ingest/enrichment exposed as
+Jellyfin **Scheduled Tasks** (Dashboard → Scheduled Tasks → *MetaHub: Update anime mappings* /
+*MetaHub: Enrich metadata*). Datasets are pulled from GitHub. Nothing else to install.
+
+First run:
+1. Configure the plugin (**Plugins → MetaHub** → Mode / Library / Engine).
+2. Run **MetaHub: Update anime mappings** once, then **MetaHub: Enrich metadata**.
+
+Turn off **embedded** only if you want the plugin to talk to a separate MetaHub server (the
+ASP.NET API / Docker setup below) instead. See [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
+> The standalone server (ASP.NET API + PostgreSQL, or a self-contained binary with SQLite)
+> remains available for non-Jellyfin clients, but is **not required** for the plugin.
 
 > The link serves [`manifest.json`](manifest.json), which lists installable versions. It is
 > populated automatically by the **Release** workflow: pushing a `v*` tag builds the plugin

@@ -10,90 +10,122 @@
     <div data-role="content">
         <div class="content-primary">
 
-            <!-- Tabs: client settings (editable) + a read-only live view of the server engine. -->
             <div class="localnav">
-                <a is="emby-linkbutton" class="ui-btn metaHubTab" data-tab="connection">Connection</a>
+                <a is="emby-linkbutton" class="ui-btn metaHubTab" data-tab="mode">Mode</a>
                 <a is="emby-linkbutton" class="ui-btn metaHubTab" data-tab="library">Library</a>
-                <a is="emby-linkbutton" class="ui-btn metaHubTab" data-tab="server">Server</a>
+                <a is="emby-linkbutton" class="ui-btn metaHubTab" data-tab="engine">Engine</a>
                 <a is="emby-linkbutton" class="ui-btn metaHubTab" data-tab="about">About</a>
             </div>
 
             <form id="metaHubConfigForm">
 
-                <!-- Connection (client) -->
-                <div class="metaHubSection" data-section="connection">
-                    <h3>Connect to your MetaHub server</h3>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="ApiBaseUrl">MetaHub API URL</label>
-                        <input id="ApiBaseUrl" name="ApiBaseUrl" type="url" is="emby-input" />
-                        <div class="fieldDescription">e.g. http://localhost:8080</div>
+                <!-- Mode -->
+                <div class="metaHubSection" data-section="mode">
+                    <label class="checkboxContainer">
+                        <input id="UseEmbeddedEngine" name="UseEmbeddedEngine" type="checkbox" is="emby-checkbox" />
+                        <span>Run embedded (no server / no Docker — uses a local SQLite database)</span>
+                    </label>
+                    <div class="fieldDescription" style="margin-bottom:1.5em;">
+                        Embedded mode runs the whole engine inside Jellyfin. Ingest and enrichment run as
+                        Jellyfin <b>Scheduled Tasks</b> (Dashboard → Scheduled Tasks → MetaHub). Turn this
+                        off only if you run a separate MetaHub server.
                     </div>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="ApiKey">API key (optional)</label>
-                        <input id="ApiKey" name="ApiKey" type="password" is="emby-input" />
+
+                    <div id="metaHubRemoteBox">
+                        <h3>Remote server (only when embedded is off)</h3>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="ApiBaseUrl">MetaHub API URL</label>
+                            <input id="ApiBaseUrl" name="ApiBaseUrl" type="url" is="emby-input" />
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="ApiKey">API key</label>
+                            <input id="ApiKey" name="ApiKey" type="password" is="emby-input" />
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="RequestTimeoutSeconds">Request timeout (seconds)</label>
+                            <input id="RequestTimeoutSeconds" name="RequestTimeoutSeconds" type="number" min="1" max="600" is="emby-input" />
+                        </div>
+                        <button is="emby-button" type="button" class="raised button-cancel block" id="metaHubTestConnection">
+                            <span>Test connection</span>
+                        </button>
+                        <div id="metaHubConnStatus" class="fieldDescription"></div>
                     </div>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="RequestTimeoutSeconds">Request timeout (seconds)</label>
-                        <input id="RequestTimeoutSeconds" name="RequestTimeoutSeconds" type="number" min="1" max="600" is="emby-input" />
-                    </div>
-                    <button is="emby-button" type="button" class="raised button-cancel block" id="metaHubTestConnection">
-                        <span>Test connection</span>
-                    </button>
-                    <div id="metaHubConnStatus" class="fieldDescription"></div>
                 </div>
 
-                <!-- Library (client): which content + language to consume -->
+                <!-- Library -->
                 <div class="metaHubSection hide" data-section="library">
                     <h3>Provide metadata for</h3>
-                    <label class="checkboxContainer">
-                        <input id="EnableMovies" name="EnableMovies" type="checkbox" is="emby-checkbox" /><span>Movies</span>
-                    </label>
-                    <label class="checkboxContainer">
-                        <input id="EnableSeries" name="EnableSeries" type="checkbox" is="emby-checkbox" /><span>Series</span>
-                    </label>
-                    <label class="checkboxContainer">
-                        <input id="EnableAnime" name="EnableAnime" type="checkbox" is="emby-checkbox" /><span>Anime</span>
-                    </label>
-                    <label class="checkboxContainer">
-                        <input id="EnableMusic" name="EnableMusic" type="checkbox" is="emby-checkbox" /><span>Music</span>
-                    </label>
-                    <label class="checkboxContainer">
-                        <input id="EnableBooks" name="EnableBooks" type="checkbox" is="emby-checkbox" /><span>Books</span>
-                    </label>
+                    <label class="checkboxContainer"><input id="EnableMovies" type="checkbox" is="emby-checkbox" /><span>Movies</span></label>
+                    <label class="checkboxContainer"><input id="EnableSeries" type="checkbox" is="emby-checkbox" /><span>Series</span></label>
+                    <label class="checkboxContainer"><input id="EnableAnime" type="checkbox" is="emby-checkbox" /><span>Anime</span></label>
+                    <label class="checkboxContainer"><input id="EnableMusic" type="checkbox" is="emby-checkbox" /><span>Music</span></label>
+                    <label class="checkboxContainer"><input id="EnableBooks" type="checkbox" is="emby-checkbox" /><span>Books</span></label>
                     <div class="inputContainer">
                         <label class="inputLabel inputLabelUnfocused" for="PreferredLanguage">Preferred language</label>
-                        <input id="PreferredLanguage" name="PreferredLanguage" type="text" is="emby-input" placeholder="de" />
+                        <input id="PreferredLanguage" type="text" is="emby-input" placeholder="de" />
                     </div>
                     <div class="inputContainer">
                         <label class="inputLabel inputLabelUnfocused" for="FallbackLanguage">Fallback language</label>
-                        <input id="FallbackLanguage" name="FallbackLanguage" type="text" is="emby-input" placeholder="en" />
+                        <input id="FallbackLanguage" type="text" is="emby-input" placeholder="en" />
                     </div>
                 </div>
 
-                <!-- Server (read-only live view of the engine config) -->
-                <div class="metaHubSection hide" data-section="server">
-                    <h3>Server engine configuration <span class="fieldDescription">(read-only)</span></h3>
-                    <p class="fieldDescription">
-                        These settings live on the MetaHub server (appsettings.json) and apply to
-                        identification, enrichment and scheduling. Edit them on the server, then reload.
-                    </p>
-                    <button is="emby-button" type="button" class="raised button-cancel block" id="metaHubReloadServer">
-                        <span>Reload from server</span>
-                    </button>
-                    <pre id="metaHubServerConfig" style="white-space:pre-wrap;margin-top:1em;"></pre>
+                <!-- Engine (embedded) -->
+                <div class="metaHubSection hide" data-section="engine">
+                    <h3>Enrichment</h3>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="WriteMode">Write mode</label>
+                        <select is="emby-select" id="WriteMode" name="WriteMode">
+                            <option value="FillMissingOnly">Fill missing only (keep existing)</option>
+                            <option value="Overwrite">Overwrite existing</option>
+                        </select>
+                    </div>
+                    <label class="checkboxContainer">
+                        <input id="EnrichOnDemand" type="checkbox" is="emby-checkbox" /><span>Enrich on demand (when a work is first matched)</span>
+                    </label>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="TmdbApiKey">TMDB API key</label>
+                        <input id="TmdbApiKey" type="password" is="emby-input" />
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="GoogleBooksApiKey">Google Books API key</label>
+                        <input id="GoogleBooksApiKey" type="password" is="emby-input" />
+                    </div>
+
+                    <h3>AniDB identification (Shoko core)</h3>
+                    <label class="checkboxContainer">
+                        <input id="AniDbEnabled" type="checkbox" is="emby-checkbox" /><span>Enable AniDB file lookup (requires a registered client + account)</span>
+                    </label>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="AniDbClientName">AniDB client name</label>
+                        <input id="AniDbClientName" type="text" is="emby-input" />
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="AniDbClientVersion">AniDB client version</label>
+                        <input id="AniDbClientVersion" type="number" min="1" is="emby-input" />
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="AniDbUsername">AniDB username</label>
+                        <input id="AniDbUsername" type="text" is="emby-input" />
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="AniDbPassword">AniDB password</label>
+                        <input id="AniDbPassword" type="password" is="emby-input" />
+                    </div>
+                    <div class="fieldDescription">
+                        These settings apply in embedded mode. Run <b>MetaHub: Update anime mappings</b> once,
+                        then <b>MetaHub: Enrich metadata</b> from Dashboard → Scheduled Tasks.
+                    </div>
                 </div>
 
                 <!-- About -->
                 <div class="metaHubSection hide" data-section="about">
-                    <p>MetaHub aggregates cross-linked metadata and artwork from a self-hosted instance.</p>
-                    <p>This plugin only reads from your MetaHub API; it never contacts external services directly.</p>
-                    <p>Identification determines the identity of files you already own; it does not fetch content.</p>
+                    <p>MetaHub aggregates cross-linked metadata and artwork for music, movies, series, anime and books.</p>
+                    <p>In embedded mode no external server or Docker is needed — everything runs inside Jellyfin with a local SQLite database, and datasets are fetched from GitHub.</p>
                     <p><a is="emby-linkbutton" class="button-link" href="https://github.com/kuschel-code/jdb" target="_blank">Project on GitHub</a></p>
                 </div>
 
-                <button is="emby-button" type="submit" class="raised button-submit block">
-                    <span>Save</span>
-                </button>
+                <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
             </form>
         </div>
     </div>
@@ -103,6 +135,9 @@
             var pluginId = 'a3f1c2d4-5b6e-47a8-9c0d-1e2f3a4b5c6d';
             var page;
 
+            var checks = ['UseEmbeddedEngine','EnableMovies','EnableSeries','EnableAnime','EnableMusic','EnableBooks','EnrichOnDemand','AniDbEnabled'];
+            var texts = ['ApiBaseUrl','ApiKey','RequestTimeoutSeconds','PreferredLanguage','FallbackLanguage','WriteMode','TmdbApiKey','GoogleBooksApiKey','AniDbClientName','AniDbClientVersion','AniDbUsername','AniDbPassword'];
+
             function showTab(name) {
                 page.querySelectorAll('.metaHubSection').forEach(function (s) {
                     s.classList.toggle('hide', s.getAttribute('data-section') !== name);
@@ -110,82 +145,55 @@
                 page.querySelectorAll('.metaHubTab').forEach(function (t) {
                     t.classList.toggle('ui-btn-active', t.getAttribute('data-tab') === name);
                 });
-                if (name === 'server') loadServerConfig();
             }
 
-            function load(config) {
-                page.querySelector('#ApiBaseUrl').value = config.ApiBaseUrl || '';
-                page.querySelector('#ApiKey').value = config.ApiKey || '';
-                page.querySelector('#RequestTimeoutSeconds').value = config.RequestTimeoutSeconds;
-                page.querySelector('#EnableMovies').checked = config.EnableMovies;
-                page.querySelector('#EnableSeries').checked = config.EnableSeries;
-                page.querySelector('#EnableAnime').checked = config.EnableAnime;
-                page.querySelector('#EnableMusic').checked = config.EnableMusic;
-                page.querySelector('#EnableBooks').checked = config.EnableBooks;
-                page.querySelector('#PreferredLanguage').value = config.PreferredLanguage || '';
-                page.querySelector('#FallbackLanguage').value = config.FallbackLanguage || '';
+            function load(c) {
+                checks.forEach(function (k) { var el = page.querySelector('#' + k); if (el) el.checked = !!c[k]; });
+                texts.forEach(function (k) { var el = page.querySelector('#' + k); if (el) el.value = c[k] != null ? c[k] : ''; });
+                toggleRemote();
             }
 
             function save() {
                 Dashboard.showLoadingMsg();
-                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-                    config.ApiBaseUrl = page.querySelector('#ApiBaseUrl').value;
-                    config.ApiKey = page.querySelector('#ApiKey').value;
-                    config.RequestTimeoutSeconds = parseInt(page.querySelector('#RequestTimeoutSeconds').value, 10) || 30;
-                    config.EnableMovies = page.querySelector('#EnableMovies').checked;
-                    config.EnableSeries = page.querySelector('#EnableSeries').checked;
-                    config.EnableAnime = page.querySelector('#EnableAnime').checked;
-                    config.EnableMusic = page.querySelector('#EnableMusic').checked;
-                    config.EnableBooks = page.querySelector('#EnableBooks').checked;
-                    config.PreferredLanguage = page.querySelector('#PreferredLanguage').value;
-                    config.FallbackLanguage = page.querySelector('#FallbackLanguage').value;
-                    ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
-                        Dashboard.processPluginConfigurationUpdateResult(result);
+                ApiClient.getPluginConfiguration(pluginId).then(function (c) {
+                    checks.forEach(function (k) { var el = page.querySelector('#' + k); if (el) c[k] = el.checked; });
+                    texts.forEach(function (k) { var el = page.querySelector('#' + k); if (el) c[k] = el.value; });
+                    c.RequestTimeoutSeconds = parseInt(c.RequestTimeoutSeconds, 10) || 30;
+                    c.AniDbClientVersion = parseInt(c.AniDbClientVersion, 10) || 1;
+                    ApiClient.updatePluginConfiguration(pluginId, c).then(function (r) {
+                        Dashboard.processPluginConfigurationUpdateResult(r);
                     });
                 });
             }
 
-            function baseUrl() {
-                return (page.querySelector('#ApiBaseUrl').value || '').replace(/\/+$/, '');
+            function toggleRemote() {
+                var embedded = page.querySelector('#UseEmbeddedEngine').checked;
+                page.querySelector('#metaHubRemoteBox').classList.toggle('hide', embedded);
             }
 
             function testConnection() {
                 var status = page.querySelector('#metaHubConnStatus');
+                var base = (page.querySelector('#ApiBaseUrl').value || '').replace(/\/+$/, '');
                 status.textContent = 'Testing...';
-                fetch(baseUrl() + '/health')
+                fetch(base + '/health')
                     .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
-                    .then(function () { status.textContent = '✓ Connected to MetaHub.'; })
+                    .then(function () { status.textContent = '✓ Connected.'; })
                     .catch(function (e) { status.textContent = '✗ Could not reach MetaHub (' + e + ').'; });
-            }
-
-            function loadServerConfig() {
-                var target = page.querySelector('#metaHubServerConfig');
-                target.textContent = 'Loading...';
-                fetch(baseUrl() + '/api/config')
-                    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
-                    .then(function (cfg) { target.textContent = JSON.stringify(cfg, null, 2); })
-                    .catch(function (e) { target.textContent = 'Could not load server config (' + e + ').'; });
             }
 
             document.querySelector('#metaHubConfigPage').addEventListener('pageshow', function () {
                 page = this;
                 Dashboard.showLoadingMsg();
-
                 page.querySelectorAll('.metaHubTab').forEach(function (t) {
                     t.addEventListener('click', function () { showTab(t.getAttribute('data-tab')); });
                 });
+                page.querySelector('#UseEmbeddedEngine').addEventListener('change', toggleRemote);
                 page.querySelector('#metaHubTestConnection').addEventListener('click', testConnection);
-                page.querySelector('#metaHubReloadServer').addEventListener('click', loadServerConfig);
                 page.querySelector('#metaHubConfigForm').addEventListener('submit', function (e) {
-                    e.preventDefault();
-                    save();
-                    return false;
+                    e.preventDefault(); save(); return false;
                 });
-
-                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-                    load(config);
-                    showTab('connection');
-                    Dashboard.hideLoadingMsg();
+                ApiClient.getPluginConfiguration(pluginId).then(function (c) {
+                    load(c); showTab('mode'); Dashboard.hideLoadingMsg();
                 });
             });
         })();

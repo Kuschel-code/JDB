@@ -63,11 +63,17 @@ jobs:
 
       - name: Package plugin zip
         run: |
-          mkdir -p artifacts
-          cp src/MetaHub.Jellyfin/build.yaml publish/jellyfin-plugin/ || true
-          zip -r -j "artifacts/metahub-jellyfin-plugin-${{ github.ref_name }}.zip" \
-            "publish/jellyfin-plugin/MetaHub.Jellyfin.dll" \
-            "publish/jellyfin-plugin/build.yaml"
+          mkdir -p artifacts staging
+          cp src/MetaHub.Jellyfin/build.yaml staging/
+          # Bundle MetaHub assemblies + the third-party deps Jellyfin does NOT ship.
+          # EF Core, SQLite and the Microsoft.Extensions.* contracts come from the host
+          # (bundling them would cause cross-boundary type conflicts).
+          for f in MetaHub.*.dll \
+                   Npgsql.dll Npgsql.EntityFrameworkCore.PostgreSQL.dll \
+                   Polly.dll Polly.Extensions.Http.dll Microsoft.Extensions.Http.Polly.dll; do
+            cp publish/jellyfin-plugin/$f staging/ 2>/dev/null || true
+          done
+          ( cd staging && zip -r "../artifacts/metahub-jellyfin-plugin-${{ github.ref_name }}.zip" . )
 
       - name: Upload plugin artifact
         uses: actions/upload-artifact@v4
