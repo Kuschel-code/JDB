@@ -4,6 +4,7 @@
     <ProjectReference Include="..\MetaHub.Domain\MetaHub.Domain.csproj" />
     <ProjectReference Include="..\MetaHub.Infrastructure\MetaHub.Infrastructure.csproj" />
     <ProjectReference Include="..\MetaHub.Ingest\MetaHub.Ingest.csproj" />
+    <ProjectReference Include="..\MetaHub.Identification\MetaHub.Identification.csproj" />
   </ItemGroup>
 
   <ItemGroup>

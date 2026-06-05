@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using MetaHub.Api.Contracts;
 using MetaHub.Domain.Entities;
 using MetaHub.Domain.Enums;
+using MetaHub.Identification;
 using MetaHub.Infrastructure;
 using MetaHub.Ingest.Anime;
 
@@ -22,6 +23,7 @@ public static class MetaHubEndpoints
         api.MapGet("/lookup", Lookup);
         api.MapGet("/search", Search);
         api.MapPost("/identify", Identify);
+        api.MapPost("/files/identify", IdentifyFile);
 
         // Admin / operational endpoints.
         var admin = app.MapGroup("/api/admin");
@@ -122,6 +124,25 @@ public static class MetaHubEndpoints
         return Results.Ok(new IdentifyResponse(
             false, null, null, IdentificationMethod.None.ToString(), 0,
             "Not identified. Online identification (M3: ED2K/AniDB, AcoustID, ISBN) is not implemented yet."));
+    }
+
+    private static async Task<IResult> IdentifyFile(
+        IdentifyFileRequest request, FileIdentificationService service, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Path))
+            return Results.BadRequest("'path' is required.");
+
+        try
+        {
+            var r = await service.IdentifyAnimeFileAsync(request.Path, request.ForceRehash, ct);
+            return Results.Ok(new FileIdentifyResponse(
+                r.MediaFileId, r.Identified, r.WorkId, r.EpisodeId,
+                r.Method.ToString(), r.Confidence, r.Ed2kHash, r.Note));
+        }
+        catch (FileNotFoundException)
+        {
+            return Results.NotFound($"File not found: {request.Path}");
+        }
     }
 
     private static async Task<IResult> RunAnimeIngest(AnimeIngestRunner runner, CancellationToken ct)

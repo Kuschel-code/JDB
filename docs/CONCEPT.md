@@ -121,4 +121,6 @@ M1 skeleton · M2 anime ingest · M3 ED2K + AniDB identification (Shoko core) ·
 M4 enrichment v1 (AniList + Jikan) · M5 API + NFO export · M6 more media types ·
 M7 Jellyfin plugin · M8 polish (conflict resolution, image scoring, i18n, monitoring).
 
-**Status:** M1 + M2 implemented. See the [README](../README.md) for build/run instructions.
+**Status:** M1 + M2 + M3 implemented (M3 = ED2K hashing in `MetaHub.Identification.Hashing`
+and the AniDB UDP client in `MetaHub.Identification.AniDb`). See the
+[README](../README.md) for build/run instructions.

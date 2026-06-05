@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MetaHub.Api.Endpoints;
+using MetaHub.Identification;
 using MetaHub.Infrastructure;
 using MetaHub.Ingest;
 
@@ -11,6 +12,7 @@ var connectionString = builder.Configuration.GetConnectionString("MetaHub")
 
 builder.Services.AddMetaHubInfrastructure(connectionString);
 builder.Services.AddAnimeIngest();
+builder.Services.AddIdentification();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
