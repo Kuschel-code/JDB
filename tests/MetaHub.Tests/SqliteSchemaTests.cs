@@ -57,4 +57,54 @@ public class SqliteSchemaTests
             if (File.Exists(dbPath)) File.Delete(dbPath);
         }
     }
+
+    [Fact]
+    public async Task OrderBy_DateTimeOffset_translates_on_sqlite()
+    {
+        // Regression: SQLite stores DateTimeOffset as TEXT and cannot ORDER BY it. The embedded
+        // enrichment runner orders works by UpdatedAt, which previously threw at query time
+        // ("SQLite does not support expressions of type 'DateTimeOffset' in ORDER BY clauses").
+        var dbPath = Path.Combine(Path.GetTempPath(), $"metahub-test-{Guid.NewGuid():N}.db");
+        try
+        {
+            var services = new ServiceCollection()
+                .AddMetaHubInfrastructureSqlite(dbPath)
+                .BuildServiceProvider();
+
+            services.EnsureMetaHubSchemaCreated();
+
+            var now = DateTimeOffset.UtcNow;
+            using (var scope = services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+                db.Works.Add(new Work
+                {
+                    Id = Guid.NewGuid(), MediaType = MediaType.Anime,
+                    CanonicalTitle = "Newer", Status = WorkStatus.Finished, UpdatedAt = now
+                });
+                db.Works.Add(new Work
+                {
+                    Id = Guid.NewGuid(), MediaType = MediaType.Anime,
+                    CanonicalTitle = "Older", Status = WorkStatus.Finished, UpdatedAt = now.AddDays(-7)
+                });
+                await db.SaveChangesAsync();
+            }
+
+            using (var scope = services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+                // Must translate to SQL ORDER BY (no client-side evaluation), mirroring EnrichmentRunner.
+                var ordered = await db.Works.OrderBy(w => w.UpdatedAt)
+                    .Select(w => w.CanonicalTitle).ToListAsync();
+                Assert.Equal(new[] { "Older", "Newer" }, ordered);
+            }
+        }
+        finally
+        {
+            // SQLite pools connections by default, which keeps the file handle open on
+            // Windows; release it before deleting the temp database.
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
 }
