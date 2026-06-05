@@ -18,9 +18,22 @@ public static class DependencyInjection
 
         AddResilientClient(services, AniListProvider.HttpClientName);
         AddResilientClient(services, JikanProvider.HttpClientName);
+        AddResilientClient(services, TmdbProvider.HttpClientName);
+        AddResilientClient(services, MusicBrainzProvider.HttpClientName);
+        AddResilientClient(services, OpenLibraryProvider.HttpClientName);
+        AddResilientClient(services, GoogleBooksProvider.HttpClientName);
 
+        // Anime
         services.AddScoped<IMetadataProvider, AniListProvider>();
         services.AddScoped<IMetadataProvider, JikanProvider>();
+        // Movies / series (and complementary anime)
+        services.AddScoped<IMetadataProvider, TmdbProvider>();
+        // Music
+        services.AddScoped<IMetadataProvider, MusicBrainzProvider>();
+        // Books
+        services.AddScoped<IMetadataProvider, OpenLibraryProvider>();
+        services.AddScoped<IMetadataProvider, GoogleBooksProvider>();
+
         services.AddScoped<EnrichmentService>();
         services.AddScoped<EnrichmentRunner>();
 

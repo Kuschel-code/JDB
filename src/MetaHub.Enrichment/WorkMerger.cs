@@ -18,36 +18,49 @@ public class WorkMerger
 
     /// <summary>
     /// Applies <paramref name="ordered"/> (already sorted most-authoritative first) to
-    /// <paramref name="work"/>. Caller is responsible for SaveChanges.
+    /// <paramref name="work"/>. In <see cref="EnrichmentWriteMode.FillMissingOnly"/> existing
+    /// values are preserved; in <see cref="EnrichmentWriteMode.Overwrite"/> they are replaced.
+    /// New genres and images are always added (additive), never removed. Caller saves.
     /// </summary>
-    public async Task ApplyAsync(Work work, IReadOnlyList<NormalizedWorkData> ordered, CancellationToken ct = default)
+    public async Task ApplyAsync(
+        Work work,
+        IReadOnlyList<NormalizedWorkData> ordered,
+        EnrichmentWriteMode writeMode = EnrichmentWriteMode.Overwrite,
+        CancellationToken ct = default)
     {
         if (ordered.Count == 0)
             return;
 
-        // Scalars: first non-null in priority order.
-        work.CanonicalTitle = FirstNonEmpty(ordered, d => d.CanonicalTitle) ?? work.CanonicalTitle;
-        work.OriginalTitle = FirstNonEmpty(ordered, d => d.OriginalTitle) ?? work.OriginalTitle;
-        work.Overview = FirstNonEmpty(ordered, d => d.Overview) ?? work.Overview;
-        work.ReleaseYear = First(ordered, d => d.ReleaseYear) ?? work.ReleaseYear;
+        // Scalars: first non-null in priority order, subject to the write mode.
+        work.CanonicalTitle = Pick(writeMode, work.CanonicalTitle, FirstNonEmpty(ordered, d => d.CanonicalTitle),
+            isEmpty: string.IsNullOrWhiteSpace) ?? work.CanonicalTitle;
+        work.OriginalTitle = Pick(writeMode, work.OriginalTitle, FirstNonEmpty(ordered, d => d.OriginalTitle),
+            isEmpty: string.IsNullOrWhiteSpace);
+        work.Overview = Pick(writeMode, work.Overview, FirstNonEmpty(ordered, d => d.Overview),
+            isEmpty: string.IsNullOrWhiteSpace);
+        work.ReleaseYear = Pick(writeMode, work.ReleaseYear, First(ordered, d => d.ReleaseYear),
+            isEmpty: v => v is null);
 
         var status = First(ordered, d => d.Status);
-        if (status is { } s && s != WorkStatus.Unknown)
+        if (status is { } s && s != WorkStatus.Unknown &&
+            (writeMode == EnrichmentWriteMode.Overwrite || work.Status == WorkStatus.Unknown))
             work.Status = s;
 
-        // Overview translations: union, higher priority wins on key clash.
+        // Overview translations: union, higher priority wins on key clash (unless fill-only).
         foreach (var data in ordered.Reverse()) // apply low→high so high overwrites
             foreach (var (lang, text) in data.OverviewTranslations)
-                work.OverviewTranslations[lang] = text;
+                if (writeMode == EnrichmentWriteMode.Overwrite || !work.OverviewTranslations.ContainsKey(lang))
+                    work.OverviewTranslations[lang] = text;
 
         work.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await ApplyDetailAsync(work, ordered, ct);
+        await ApplyDetailAsync(work, ordered, writeMode, ct);
         await ApplyGenresAsync(work, ordered, ct);
         ApplyImages(work, ordered);
     }
 
-    private async Task ApplyDetailAsync(Work work, IReadOnlyList<NormalizedWorkData> ordered, CancellationToken ct)
+    private async Task ApplyDetailAsync(
+        Work work, IReadOnlyList<NormalizedWorkData> ordered, EnrichmentWriteMode writeMode, CancellationToken ct)
     {
         switch (work.MediaType)
         {
@@ -62,9 +75,9 @@ public class WorkMerger
                 var detail = await GetOrAddDetailAsync(
                     work.SeriesDetail, _db.SeriesDetails, s => s.WorkId == work.Id,
                     () => new SeriesDetail { WorkId = work.Id }, ct);
-                detail.EpisodeCount = episodeCount ?? detail.EpisodeCount;
-                detail.SeasonCount = seasonCount ?? detail.SeasonCount;
-                detail.Network = network ?? detail.Network;
+                detail.EpisodeCount = Pick(writeMode, detail.EpisodeCount, episodeCount, v => v is null);
+                detail.SeasonCount = Pick(writeMode, detail.SeasonCount, seasonCount, v => v is null);
+                detail.Network = Pick(writeMode, detail.Network, network, string.IsNullOrWhiteSpace);
                 work.SeriesDetail = detail;
                 break;
             }
@@ -79,9 +92,9 @@ public class WorkMerger
                 var detail = await GetOrAddDetailAsync(
                     work.MusicDetail, _db.MusicDetails, m => m.WorkId == work.Id,
                     () => new MusicDetail { WorkId = work.Id }, ct);
-                detail.TrackCount = trackCount ?? detail.TrackCount;
-                detail.AlbumType = albumType ?? detail.AlbumType;
-                detail.Label = label ?? detail.Label;
+                detail.TrackCount = Pick(writeMode, detail.TrackCount, trackCount, v => v is null);
+                detail.AlbumType = Pick(writeMode, detail.AlbumType, albumType, string.IsNullOrWhiteSpace);
+                detail.Label = Pick(writeMode, detail.Label, label, string.IsNullOrWhiteSpace);
                 work.MusicDetail = detail;
                 break;
             }
@@ -98,11 +111,11 @@ public class WorkMerger
                 var detail = await GetOrAddDetailAsync(
                     work.BookDetail, _db.BookDetails, bk => bk.WorkId == work.Id,
                     () => new BookDetail { WorkId = work.Id }, ct);
-                detail.Isbn13 = isbn ?? detail.Isbn13;
-                detail.PageCount = pages ?? detail.PageCount;
-                detail.Publisher = publisher ?? detail.Publisher;
-                detail.SeriesName = seriesName ?? detail.SeriesName;
-                detail.SeriesIndex = seriesIndex ?? detail.SeriesIndex;
+                detail.Isbn13 = Pick(writeMode, detail.Isbn13, isbn, string.IsNullOrWhiteSpace);
+                detail.PageCount = Pick(writeMode, detail.PageCount, pages, v => v is null);
+                detail.Publisher = Pick(writeMode, detail.Publisher, publisher, string.IsNullOrWhiteSpace);
+                detail.SeriesName = Pick(writeMode, detail.SeriesName, seriesName, string.IsNullOrWhiteSpace);
+                detail.SeriesIndex = Pick(writeMode, detail.SeriesIndex, seriesIndex, v => v is null);
                 work.BookDetail = detail;
                 break;
             }
@@ -190,6 +203,22 @@ public class WorkMerger
             _db.Images.Add(entity);
             work.Images.Add(entity);
         }
+    }
+
+    // Chooses between an existing and an incoming value according to the write mode.
+    private static string? Pick(EnrichmentWriteMode mode, string? existing, string? incoming, Func<string?, bool> isEmpty)
+    {
+        if (incoming is null || isEmpty(incoming)) return existing;
+        if (mode == EnrichmentWriteMode.Overwrite) return incoming;
+        return isEmpty(existing) ? incoming : existing;
+    }
+
+    private static T? Pick<T>(EnrichmentWriteMode mode, T? existing, T? incoming, Func<T?, bool> isEmpty)
+        where T : struct
+    {
+        if (incoming is null) return existing;
+        if (mode == EnrichmentWriteMode.Overwrite) return incoming;
+        return isEmpty(existing) ? incoming : existing;
     }
 
     private static string? FirstNonEmpty(IReadOnlyList<NormalizedWorkData> ordered, Func<NormalizedWorkData, string?> select)

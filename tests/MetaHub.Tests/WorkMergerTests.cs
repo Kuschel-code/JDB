@@ -48,7 +48,7 @@ public class WorkMergerTests
         jikan.Images.Add(new NormalizedImage { Type = ImageType.Poster, Url = "https://img/a.jpg", Score = 60 }); // dup URL
         jikan.Images.Add(new NormalizedImage { Type = ImageType.Poster, Url = "https://img/b.jpg", Score = 60 });
 
-        await new WorkMerger(db).ApplyAsync(work, new[] { aniList, jikan });
+        await new WorkMerger(db).ApplyAsync(work, new[] { aniList, jikan }, EnrichmentWriteMode.Overwrite);
         await db.SaveChangesAsync();
 
         var saved = await db.Works.AsNoTracking().SingleAsync(w => w.Id == work.Id);
@@ -63,5 +63,38 @@ public class WorkMergerTests
         // Counts queried separately (InMemory inflates collection Includes via cartesian joins).
         Assert.Equal(2, await db.WorkGenres.CountAsync(wg => wg.WorkId == work.Id)); // Action + Sci-Fi
         Assert.Equal(2, await db.Images.CountAsync(i => i.WorkId == work.Id));       // a.jpg + b.jpg (deduped)
+    }
+
+    [Fact]
+    public async Task FillMissingOnly_preserves_existing_scalars_but_adds_new_data()
+    {
+        await using var db = NewDb();
+        var work = new Work
+        {
+            MediaType = MediaType.Anime,
+            CanonicalTitle = "Existing Title",
+            Overview = "Existing overview"
+            // ReleaseYear intentionally null (a gap to be filled)
+        };
+        db.Works.Add(work);
+        await db.SaveChangesAsync();
+
+        var incoming = new NormalizedWorkData
+        {
+            Source = ExternalIdSource.AniList,
+            CanonicalTitle = "New Title",     // must NOT overwrite
+            Overview = "New overview",        // must NOT overwrite
+            ReleaseYear = 1998                // gap -> should be filled
+        };
+        incoming.Genres.Add("Action");        // additive regardless of mode
+
+        await new WorkMerger(db).ApplyAsync(work, new[] { incoming }, EnrichmentWriteMode.FillMissingOnly);
+        await db.SaveChangesAsync();
+
+        var saved = await db.Works.AsNoTracking().SingleAsync(w => w.Id == work.Id);
+        Assert.Equal("Existing Title", saved.CanonicalTitle);
+        Assert.Equal("Existing overview", saved.Overview);
+        Assert.Equal(1998, saved.ReleaseYear);
+        Assert.Equal(1, await db.WorkGenres.CountAsync(wg => wg.WorkId == work.Id));
     }
 }

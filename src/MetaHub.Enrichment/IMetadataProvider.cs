@@ -21,8 +21,11 @@ public interface IMetadataProvider
     /// <summary>Returns the provider's external id for this work, or null if not applicable.</summary>
     string? GetExternalId(Work work);
 
-    /// <summary>Fetches the raw response body for the given id (HTTP, Polly-protected). Null on miss.</summary>
-    Task<string?> FetchRawAsync(string externalId, CancellationToken ct = default);
+    /// <summary>
+    /// Fetches the raw response body for the given id (HTTP, Polly-protected). Null on miss.
+    /// The <paramref name="work"/> is supplied for context (e.g. TMDB movie vs. tv endpoint).
+    /// </summary>
+    Task<string?> FetchRawAsync(Work work, string externalId, CancellationToken ct = default);
 
     /// <summary>Parses a raw response body into normalized data.</summary>
     NormalizedWorkData Parse(string rawBody);

@@ -32,7 +32,11 @@ public class EnrichmentService
         _log = log;
     }
 
-    public async Task<EnrichmentResult> EnrichAsync(Guid workId, bool forceRefresh = false, CancellationToken ct = default)
+    public async Task<EnrichmentResult> EnrichAsync(
+        Guid workId,
+        bool forceRefresh = false,
+        EnrichmentWriteMode? writeMode = null,
+        CancellationToken ct = default)
     {
         var work = await _db.Works
             .Include(w => w.ExternalIds)
@@ -65,7 +69,7 @@ public class EnrichmentService
 
             if (body is null)
             {
-                body = await provider.FetchRawAsync(externalId, ct);
+                body = await provider.FetchRawAsync(work, externalId, ct);
                 if (body is null)
                 {
                     result.Misses.Add(provider.Source.ToString());
@@ -89,7 +93,7 @@ public class EnrichmentService
 
         if (collected.Count > 0)
         {
-            await new WorkMerger(_db).ApplyAsync(work, collected, ct);
+            await new WorkMerger(_db).ApplyAsync(work, collected, writeMode ?? _options.WriteMode, ct);
             await _db.SaveChangesAsync(ct);
         }
 

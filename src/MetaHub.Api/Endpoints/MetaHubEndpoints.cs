@@ -162,20 +162,25 @@ public static class MetaHubEndpoints
     }
 
     private static async Task<IResult> EnrichWork(
-        Guid id, bool? force, EnrichmentService service, CancellationToken ct)
+        Guid id, bool? force, string? writeMode, EnrichmentService service, CancellationToken ct)
     {
-        var result = await service.EnrichAsync(id, force ?? false, ct);
+        var mode = ParseWriteMode(writeMode);
+        var result = await service.EnrichAsync(id, force ?? false, mode, ct);
         return result.Found
             ? Results.Ok(new { result.WorkId, result.Applied, result.Misses })
             : Results.NotFound();
     }
 
     private static async Task<IResult> EnrichAnime(
-        EnrichmentRunner runner, CancellationToken ct, int max = 100, int delayMs = 1000, bool force = false)
+        EnrichmentRunner runner, CancellationToken ct,
+        int max = 100, int delayMs = 1000, bool force = false, bool onlyMissing = false, string? writeMode = null)
     {
-        var enriched = await runner.EnrichAnimeAsync(max, delayMs, force, ct);
+        var enriched = await runner.EnrichAnimeAsync(max, delayMs, force, onlyMissing, ParseWriteMode(writeMode), ct);
         return Results.Ok(new { enriched });
     }
+
+    private static EnrichmentWriteMode? ParseWriteMode(string? value)
+        => Enum.TryParse<EnrichmentWriteMode>(value, true, out var mode) ? mode : null;
 
     private static async Task<IResult> GetWorkNfo(Guid id, NfoExportService export, CancellationToken ct)
     {

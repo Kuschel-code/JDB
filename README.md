@@ -99,6 +99,16 @@ This computes the file's **ED2K** hash (MD4-based) and, if AniDB is enabled, res
 the AniDB UDP **FILE** command to the exact anime/episode, then links it to the matching
 `Work`. The hash is cached so it is never recomputed.
 
+### Enrichment write mode
+
+Enrichment can either **only fill missing fields** (default, never touches existing metadata)
+or **overwrite** with the highest-priority provider value. Set it globally via
+`Enrichment:WriteMode` (`FillMissingOnly` | `Overwrite`) or per request with `?writeMode=`.
+Batch enrichment can also target only works that have no metadata yet via `?onlyMissing=true`.
+Genres and images are always additive (never removed).
+
+### AniDB
+
 AniDB is **disabled by default** and requires a registered UDP client plus account. Enable
 it under the `AniDb` configuration section (respect AniDB's strict rate limits — the client
 serializes requests and waits between packets):
@@ -138,7 +148,7 @@ serializes requests and waits between packets):
 - [x] **M3** Anime identification: ED2K hashing + AniDB file lookup (Shoko core)
 - [x] **M4** Enrichment v1: AniList + Jikan end-to-end (Polly + cache)
 - [x] **M5** API + NFO export, first Jellyfin test
-- [ ] **M6** More media types: movies/series, music, books
+- [x] **M6** More media types: movies/series (TMDB), music (MusicBrainz), books (Open Library + Google Books)
 - [ ] **M7** Jellyfin metadata/image provider plugin _(settings page started in `MetaHub.Jellyfin`)_
 - [ ] **M8** Conflict resolution, image scoring, i18n, monitoring
 

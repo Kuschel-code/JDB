@@ -23,7 +23,7 @@ public class JikanProvider : IMetadataProvider
     public string? GetExternalId(Work work)
         => work.ExternalIds.FirstOrDefault(x => x.Source == ExternalIdSource.Mal)?.ExternalValue;
 
-    public async Task<string?> FetchRawAsync(string externalId, CancellationToken ct = default)
+    public async Task<string?> FetchRawAsync(Work work, string externalId, CancellationToken ct = default)
     {
         if (!int.TryParse(externalId, out var id))
             return null;
