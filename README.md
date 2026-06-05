@@ -123,6 +123,22 @@ serializes requests and waits between packets):
 }
 ```
 
+### Scheduled scan
+
+A built-in background scheduler can periodically refresh the mapping datasets, enrich works,
+and scan library folders to identify new files (ED2K/AniDB). It is **disabled by default**;
+configure it under the `Scheduler` section:
+
+```jsonc
+"Scheduler": {
+  "Enabled": true,
+  "EnrichmentEnabled": true,  "EnrichmentIntervalMinutes": 360, "EnrichmentOnlyMissing": true,
+  "IngestEnabled": false,     "IngestIntervalHours": 168,
+  "ScanEnabled": true,        "ScanIntervalMinutes": 60,
+  "AnimeLibraryPaths": ["/media/anime"]
+}
+```
+
 ## API endpoints
 
 | Method | Route                                  | Purpose                                   |
@@ -149,7 +165,7 @@ serializes requests and waits between packets):
 - [x] **M4** Enrichment v1: AniList + Jikan end-to-end (Polly + cache)
 - [x] **M5** API + NFO export, first Jellyfin test
 - [x] **M6** More media types: movies/series (TMDB), music (MusicBrainz), books (Open Library + Google Books)
-- [ ] **M7** Jellyfin metadata/image provider plugin _(settings page started in `MetaHub.Jellyfin`)_
+- [x] **M7** Jellyfin metadata/image provider plugin (`MetaHub.Jellyfin`, fetches from the API)
 - [ ] **M8** Conflict resolution, image scoring, i18n, monitoring
 
 ## Tests

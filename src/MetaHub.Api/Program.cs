@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MetaHub.Api.Endpoints;
+using MetaHub.Api.Scheduling;
 using MetaHub.Enrichment;
 using MetaHub.Export;
 using MetaHub.Identification;
@@ -17,6 +18,9 @@ builder.Services.AddAnimeIngest();
 builder.Services.AddIdentification();
 builder.Services.AddEnrichment();
 builder.Services.AddNfoExport();
+
+builder.Services.AddOptions<SchedulerOptions>().BindConfiguration(SchedulerOptions.SectionName);
+builder.Services.AddHostedService<ScheduledScanService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
