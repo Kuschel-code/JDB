@@ -10,11 +10,13 @@ public class MetaHubMovieProvider : IRemoteMetadataProvider<Movie, MovieInfo>
 {
     private readonly IMetaHubBackend _backend;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly MetaHubItemGate _gate;
 
-    public MetaHubMovieProvider(IMetaHubBackend backend, IHttpClientFactory httpClientFactory)
+    public MetaHubMovieProvider(IMetaHubBackend backend, IHttpClientFactory httpClientFactory, MetaHubItemGate gate)
     {
         _backend = backend;
         _httpClientFactory = httpClientFactory;
+        _gate = gate;
     }
 
     public string Name => "MetaHub";
@@ -25,7 +27,7 @@ public class MetaHubMovieProvider : IRemoteMetadataProvider<Movie, MovieInfo>
         var config = Plugin.Instance!.Configuration;
         var work = await _backend.ResolveAsync(info.ProviderIds, config.PreferredLanguage, cancellationToken)
             .ConfigureAwait(false);
-        if (work is null || !MetaHubMapping.IsMediaTypeEnabled(work.MediaType, config))
+        if (work is null || !_gate.IsServed(info, work.MediaType, config))
             return result;
 
         result.HasMetadata = true;

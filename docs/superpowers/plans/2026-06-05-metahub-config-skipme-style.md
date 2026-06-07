@@ -1,3 +1,386 @@
+# MetaHub SkipMe.db-style config page — Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Replace MetaHub's plugin config page with a SkipMe.db-style per-item manager (library → series → season + movies) with instant-saving toggles, and gate the metadata/image providers so disabled items are not surfaced to Jellyfin.
+
+**Architecture:** An opt-out disabled-set (`DisabledItemIds`) on `PluginConfiguration`; a `MetaHubItemGate` whose pure core decides "blocked?" from an item's id + ancestor ids vs. the set (the providers resolve the item — via `ILibraryManager` for `*Info`, or directly for the image `BaseItem`); a rewritten `configPage.html` that lists libraries/items via the Jellyfin web `ApiClient` and saves toggles with a debounced `updatePluginConfiguration`.
+
+**Tech Stack:** .NET 9, Jellyfin 10.11 plugin SDK (`Jellyfin.Controller`), xUnit, vanilla JS + Jellyfin `ApiClient` / `Dashboard` globals.
+
+**Working directory:** `C:\Users\Kuscheltier\JDB`, branch `claude/config-skipme-style`.
+Spec: `docs/superpowers/specs/2026-06-05-metahub-config-skipme-style-design.md`.
+
+---
+
+## File Structure
+
+| File | Responsibility |
+|------|----------------|
+| `src/MetaHub.Jellyfin/Configuration/PluginConfiguration.cs` | + `DisabledItemIds` field (the persisted opt-out set) |
+| `src/MetaHub.Jellyfin/MetaHubItemGate.cs` | **new** — decides whether MetaHub may serve an item (pure `IsBlocked` + `ILibraryManager`-backed resolution) |
+| `src/MetaHub.Jellyfin/Providers/MetaHubSeriesProvider.cs` | inject + call the gate |
+| `src/MetaHub.Jellyfin/Providers/MetaHubMovieProvider.cs` | inject + call the gate |
+| `src/MetaHub.Jellyfin/Providers/MetaHubImageProvider.cs` | inject + call the gate (BaseItem overload) |
+| `src/MetaHub.Jellyfin/MetaHubServiceRegistrator.cs` | register `MetaHubItemGate` |
+| `src/MetaHub.Jellyfin/Configuration/configPage.html` | full UI rewrite |
+| `tests/MetaHub.Tests/MetaHub.Tests.csproj` | + ProjectReference to `MetaHub.Jellyfin` |
+| `tests/MetaHub.Tests/MetaHubItemGateTests.cs` | **new** — unit tests for the gate's pure core |
+
+---
+
+## Task 1: Add the `DisabledItemIds` setting
+
+**Files:**
+- Modify: `src/MetaHub.Jellyfin/Configuration/PluginConfiguration.cs`
+
+- [ ] **Step 1: Add the field**
+
+In `PluginConfiguration`, immediately after the `EnableBooks` property (in the
+`// --- Library: which content + language (both modes) ---` section), add:
+
+```csharp
+    /// <summary>
+    /// Jellyfin item GUIDs ("N" format) of libraries, series, seasons or movies for which
+    /// MetaHub must NOT surface metadata/artwork. Empty = everything enabled (opt-out model).
+    /// Children inherit a disabled ancestor, so only the highest disabled node is stored.
+    /// </summary>
+    public string[] DisabledItemIds { get; set; } = System.Array.Empty<string>();
+```
+
+- [ ] **Step 2: Build to verify it compiles**
+
+Run: `dotnet build src/MetaHub.Jellyfin/MetaHub.Jellyfin.csproj -c Release --nologo`
+Expected: `0 Fehler`.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/MetaHub.Jellyfin/Configuration/PluginConfiguration.cs
+git commit -m "Add DisabledItemIds opt-out set to plugin configuration"
+```
+
+---
+
+## Task 2: `MetaHubItemGate` (pure core, TDD)
+
+**Files:**
+- Modify: `tests/MetaHub.Tests/MetaHub.Tests.csproj`
+- Create: `tests/MetaHub.Tests/MetaHubItemGateTests.cs`
+- Create: `src/MetaHub.Jellyfin/MetaHubItemGate.cs`
+
+- [ ] **Step 1: Reference MetaHub.Jellyfin from the test project**
+
+In `tests/MetaHub.Tests/MetaHub.Tests.csproj`, inside the existing `<ItemGroup>` that holds the
+`ProjectReference` elements, add:
+
+```xml
+    <ProjectReference Include="..\..\src\MetaHub.Jellyfin\MetaHub.Jellyfin.csproj" />
+```
+
+- [ ] **Step 2: Write the failing tests**
+
+Create `tests/MetaHub.Tests/MetaHubItemGateTests.cs`:
+
+```csharp
+using MetaHub.Jellyfin;
+using Xunit;
+
+namespace MetaHub.Tests;
+
+/// <summary>
+/// Covers the pure decision core of the gate (id + ancestor ids vs. the disabled set).
+/// The ILibraryManager-backed resolution is a thin wrapper and is exercised live, not here.
+/// </summary>
+public class MetaHubItemGateTests
+{
+    [Fact]
+    public void Empty_disabled_set_serves_everything()
+    {
+        var ids = new[] { Guid.NewGuid(), Guid.NewGuid() };
+        Assert.False(MetaHubItemGate.IsBlocked(ids, Array.Empty<string>()));
+    }
+
+    [Fact]
+    public void Blocks_when_item_itself_is_disabled()
+    {
+        var item = Guid.NewGuid();
+        Assert.True(MetaHubItemGate.IsBlocked(new[] { item }, new[] { item.ToString("N") }));
+    }
+
+    [Fact]
+    public void Blocks_when_an_ancestor_is_disabled()
+    {
+        var item = Guid.NewGuid();
+        var series = Guid.NewGuid();
+        var library = Guid.NewGuid();
+        Assert.True(MetaHubItemGate.IsBlocked(
+            new[] { item, series, library }, new[] { library.ToString("N") }));
+    }
+
+    [Fact]
+    public void Serves_when_neither_item_nor_ancestor_is_disabled()
+    {
+        var ids = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+        Assert.False(MetaHubItemGate.IsBlocked(ids, new[] { Guid.NewGuid().ToString("N") }));
+    }
+
+    [Fact]
+    public void Ignores_empty_guids_and_is_case_insensitive()
+    {
+        var item = Guid.NewGuid();
+        Assert.False(MetaHubItemGate.IsBlocked(new[] { Guid.Empty }, new[] { Guid.Empty.ToString("N") }));
+        Assert.True(MetaHubItemGate.IsBlocked(new[] { item }, new[] { item.ToString("N").ToUpperInvariant() }));
+    }
+}
+```
+
+- [ ] **Step 3: Create the gate so the tests compile/run**
+
+Create `src/MetaHub.Jellyfin/MetaHubItemGate.cs`:
+
+```csharp
+using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Providers;
+using MetaHub.Jellyfin.Api;
+using MetaHub.Jellyfin.Configuration;
+
+namespace MetaHub.Jellyfin;
+
+/// <summary>
+/// Decides whether MetaHub may surface metadata/artwork for a given item. An item is blocked
+/// when its media type is disabled, or when the item itself or any ancestor is in
+/// <see cref="PluginConfiguration.DisabledItemIds"/>. Fails open: if an item cannot be resolved
+/// it is served (a lookup miss never hides data).
+/// </summary>
+public sealed class MetaHubItemGate
+{
+    private readonly ILibraryManager _libraryManager;
+
+    public MetaHubItemGate(ILibraryManager libraryManager) => _libraryManager = libraryManager;
+
+    /// <summary>Pure core: is any of the item's own/ancestor ids in the disabled set?</summary>
+    public static bool IsBlocked(IEnumerable<Guid> selfAndAncestorIds, IReadOnlyCollection<string> disabledItemIds)
+    {
+        if (disabledItemIds.Count == 0)
+            return false;
+
+        var disabled = new HashSet<string>(disabledItemIds, StringComparer.OrdinalIgnoreCase);
+        foreach (var id in selfAndAncestorIds)
+        {
+            if (id != Guid.Empty && disabled.Contains(id.ToString("N")))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Image provider path: the item is already in hand.</summary>
+    public bool IsServed(BaseItem item, string mediaType, PluginConfiguration config)
+    {
+        if (!MetaHubMapping.IsMediaTypeEnabled(mediaType, config))
+            return false;
+        if (config.DisabledItemIds.Length == 0)
+            return true;
+        return !IsBlocked(SelfAndAncestors(item), config.DisabledItemIds);
+    }
+
+    /// <summary>Metadata provider path: resolve the item from its provider ids first.</summary>
+    public bool IsServed(ItemLookupInfo info, string mediaType, PluginConfiguration config)
+    {
+        if (!MetaHubMapping.IsMediaTypeEnabled(mediaType, config))
+            return false;
+        if (config.DisabledItemIds.Length == 0)
+            return true;
+
+        var item = ResolveItem(info.ProviderIds);
+        if (item is null)
+            return true; // fail open — nothing to gate yet
+        return !IsBlocked(SelfAndAncestors(item), config.DisabledItemIds);
+    }
+
+    private static IEnumerable<Guid> SelfAndAncestors(BaseItem item)
+    {
+        yield return item.Id;
+        foreach (var parent in item.GetParents())
+            yield return parent.Id;
+    }
+
+    private BaseItem? ResolveItem(IReadOnlyDictionary<string, string>? providerIds)
+    {
+        if (providerIds is null || providerIds.Count == 0)
+            return null;
+
+        var query = new InternalItemsQuery
+        {
+            HasAnyProviderId = new Dictionary<string, string>(providerIds)
+        };
+        return _libraryManager.GetItemList(query).FirstOrDefault();
+    }
+}
+```
+
+- [ ] **Step 4: Run the tests**
+
+Run: `dotnet test MetaHub.sln -c Release --nologo --filter "FullyQualifiedName~MetaHubItemGateTests"`
+Expected: `erfolgreich: 5, Fehler: 0`. (The first build may pull Jellyfin assemblies; that is expected.)
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add tests/MetaHub.Tests/MetaHub.Tests.csproj tests/MetaHub.Tests/MetaHubItemGateTests.cs src/MetaHub.Jellyfin/MetaHubItemGate.cs
+git commit -m "Add MetaHubItemGate with per-item ancestry gating + tests"
+```
+
+---
+
+## Task 3: Register the gate and wire it into the providers
+
+**Files:**
+- Modify: `src/MetaHub.Jellyfin/MetaHubServiceRegistrator.cs`
+- Modify: `src/MetaHub.Jellyfin/Providers/MetaHubSeriesProvider.cs`
+- Modify: `src/MetaHub.Jellyfin/Providers/MetaHubMovieProvider.cs`
+- Modify: `src/MetaHub.Jellyfin/Providers/MetaHubImageProvider.cs`
+
+- [ ] **Step 1: Register the gate in DI**
+
+In `MetaHubServiceRegistrator.RegisterServices`, immediately before the line
+`services.AddSingleton<IMetaHubBackend, MetaHubBackend>();`, add:
+
+```csharp
+        // Per-item enable/disable gate (resolves library ancestry; ILibraryManager is host-provided).
+        services.AddSingleton<MetaHubItemGate>();
+```
+
+- [ ] **Step 2: Inject + call the gate in the series provider**
+
+In `src/MetaHub.Jellyfin/Providers/MetaHubSeriesProvider.cs` add `using MetaHub.Jellyfin;` and
+replace the fields + constructor with:
+
+```csharp
+    private readonly IMetaHubBackend _backend;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly MetaHubItemGate _gate;
+
+    public MetaHubSeriesProvider(IMetaHubBackend backend, IHttpClientFactory httpClientFactory, MetaHubItemGate gate)
+    {
+        _backend = backend;
+        _httpClientFactory = httpClientFactory;
+        _gate = gate;
+    }
+```
+
+Replace the guard:
+
+```csharp
+        if (work is null || !MetaHubMapping.IsMediaTypeEnabled(work.MediaType, config))
+            return result;
+```
+
+with:
+
+```csharp
+        if (work is null || !_gate.IsServed(info, work.MediaType, config))
+            return result;
+```
+
+- [ ] **Step 3: Inject + call the gate in the movie provider**
+
+In `src/MetaHub.Jellyfin/Providers/MetaHubMovieProvider.cs` add `using MetaHub.Jellyfin;` and
+replace the fields + constructor with:
+
+```csharp
+    private readonly IMetaHubBackend _backend;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly MetaHubItemGate _gate;
+
+    public MetaHubMovieProvider(IMetaHubBackend backend, IHttpClientFactory httpClientFactory, MetaHubItemGate gate)
+    {
+        _backend = backend;
+        _httpClientFactory = httpClientFactory;
+        _gate = gate;
+    }
+```
+
+Replace the guard:
+
+```csharp
+        if (work is null || !MetaHubMapping.IsMediaTypeEnabled(work.MediaType, config))
+            return result;
+```
+
+with:
+
+```csharp
+        if (work is null || !_gate.IsServed(info, work.MediaType, config))
+            return result;
+```
+
+- [ ] **Step 4: Inject + call the gate in the image provider**
+
+In `src/MetaHub.Jellyfin/Providers/MetaHubImageProvider.cs` add `using MetaHub.Jellyfin;` and
+replace the fields + constructor with:
+
+```csharp
+    private readonly IMetaHubBackend _backend;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly MetaHubItemGate _gate;
+
+    public MetaHubImageProvider(IMetaHubBackend backend, IHttpClientFactory httpClientFactory, MetaHubItemGate gate)
+    {
+        _backend = backend;
+        _httpClientFactory = httpClientFactory;
+        _gate = gate;
+    }
+```
+
+Replace the guard (the `BaseItem item` is already a parameter of `GetImages`):
+
+```csharp
+        if (work is null || !MetaHubMapping.IsMediaTypeEnabled(work.MediaType, config))
+            return Enumerable.Empty<RemoteImageInfo>();
+```
+
+with:
+
+```csharp
+        if (work is null || !_gate.IsServed(item, work.MediaType, config))
+            return Enumerable.Empty<RemoteImageInfo>();
+```
+
+- [ ] **Step 5: Build the whole solution**
+
+Run: `dotnet build MetaHub.sln -c Release --nologo`
+Expected: `0 Warnung(en)`, `0 Fehler`.
+
+- [ ] **Step 6: Run the full test suite**
+
+Run: `dotnet test MetaHub.sln -c Release --no-build --nologo`
+Expected: all tests pass except the two pre-existing Windows-only temp-file-delete flakes
+(`EnsureCreated_then_roundtrip_work_with_translations`, `EmbeddedSqlitePipelineTests.Ingest_then_merge_runs_on_sqlite`)
+which fail with `System.IO.IOException` at `FileSystem.DeleteFile` — environmental, not regressions.
+`MetaHubItemGateTests` pass.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/MetaHub.Jellyfin/MetaHubServiceRegistrator.cs src/MetaHub.Jellyfin/Providers/MetaHubSeriesProvider.cs src/MetaHub.Jellyfin/Providers/MetaHubMovieProvider.cs src/MetaHub.Jellyfin/Providers/MetaHubImageProvider.cs
+git commit -m "Gate metadata/image providers on the per-item disabled set"
+```
+
+---
+
+## Task 4: Rewrite `configPage.html` (SkipMe.db-style)
+
+**Files:**
+- Modify (full replace): `src/MetaHub.Jellyfin/Configuration/configPage.html`
+
+- [ ] **Step 1: Replace the file with the new UI**
+
+Write `src/MetaHub.Jellyfin/Configuration/configPage.html` with exactly this content:
+
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -294,3 +677,79 @@
 </div>
 </body>
 </html>
+```
+
+- [ ] **Step 2: Build (confirms the embedded config page still resolves)**
+
+Run: `dotnet build src/MetaHub.Jellyfin/MetaHub.Jellyfin.csproj -c Release --nologo`
+Expected: `0 Fehler`.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/MetaHub.Jellyfin/Configuration/configPage.html
+git commit -m "Rewrite config page: SkipMe.db-style per-item library manager"
+```
+
+---
+
+## Task 5: Ship + live-verify on the test server
+
+**Files:** none (CI + deploy).
+
+- [ ] **Step 1: Open the PR and merge after CI is green**
+
+```bash
+git push -u origin claude/config-skipme-style
+gh pr create --repo Kuschel-code/JDB --base main --head claude/config-skipme-style \
+  --title "SkipMe.db-style config: per-item enable/disable" \
+  --body "Per-item (library/series/season/movie) enable/disable with instant-saving toggles, cover art and filter; providers gate on the disabled set. Spec: docs/superpowers/specs/2026-06-05-metahub-config-skipme-style-design.md"
+```
+Wait for `gh pr checks <n> --repo Kuschel-code/JDB` → `build-test pass`, then
+`gh pr merge <n> --repo Kuschel-code/JDB --merge --delete-branch`.
+
+- [ ] **Step 2: Tag a release**
+
+```bash
+git fetch origin main -q
+git tag v0.1.5 origin/main
+git push origin v0.1.5
+```
+Wait: `gh run list -R Kuschel-code/JDB --workflow=release.yml -L 1` → `completed/success`. Then
+verify the manifest+asset MD5 match (API, uncached) as in prior releases.
+
+- [ ] **Step 3: Update the plugin on the test server**
+
+Jellyfin `http://192.168.178.113:30013` (user `Jellyfin` / pw `18`). Using the context-mode JS
+executor (curl is blocked): authenticate (`POST /Users/AuthenticateByName`), then
+`POST /Packages/Installed/MetaHub?version=0.1.5.0`, wait ~10 s, `POST /System/Restart`, poll
+`GET /System/Info/Public` until 200. Confirm the log shows `Loaded plugin: "MetaHub" "0.1.5.0"`
+and no "App needs to be restarted" loop.
+
+- [ ] **Step 4: Verify the config page live with Playwright**
+
+Navigate to `http://192.168.178.113:30013/web/#/configurationpage?name=MetaHub`. Verify:
+1. The **Libraries** pane lists libraries (e.g. "Anime") with a master toggle.
+2. Expanding "Anime" lazy-loads series rows with cover thumbnails.
+3. Toggling a series **off** persists: re-read `GET /Plugins/{guid}/Configuration` and assert the
+   series' id (norm "N" form) is now in `DisabledItemIds`; toggling it back **on** removes it.
+4. The **Engine** pane loads existing values and its **Save** button still works.
+
+- [ ] **Step 5: (Optional) confirm gating end-to-end**
+
+Disable one series in the UI, then in Jellyfin refresh that series' metadata ("replace all") and
+confirm from the Jellyfin log that MetaHub did not return data for it; re-enable afterwards.
+
+---
+
+## Self-review notes
+
+- **Spec coverage:** opt-out `DisabledItemIds` (T1); gate + ancestry + fail-open (T2); provider
+  wiring incl. the `BaseItem` image overload (T3); full UI with pills/filter/lazy-tree/instant-save
+  (T4); live verification incl. gating (T5). The pure gate core is unit-tested (T2).
+- **Known environmental caveat:** two pre-existing SQLite tests fail on Windows only
+  (temp-file delete lock); they pass on CI Linux — do not "fix" them here.
+- **Type consistency:** `IsServed(ItemLookupInfo, string, PluginConfiguration)`,
+  `IsServed(BaseItem, string, PluginConfiguration)` and
+  `IsBlocked(IEnumerable<Guid>, IReadOnlyCollection<string>)` are used identically in the gate
+  and all three providers; `work.MediaType` is a string everywhere.
