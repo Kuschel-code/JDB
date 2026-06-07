@@ -13,11 +13,13 @@ public class MetaHubImageProvider : IRemoteImageProvider
 {
     private readonly IMetaHubBackend _backend;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly MetaHubItemGate _gate;
 
-    public MetaHubImageProvider(IMetaHubBackend backend, IHttpClientFactory httpClientFactory)
+    public MetaHubImageProvider(IMetaHubBackend backend, IHttpClientFactory httpClientFactory, MetaHubItemGate gate)
     {
         _backend = backend;
         _httpClientFactory = httpClientFactory;
+        _gate = gate;
     }
 
     public string Name => "MetaHub";
@@ -38,7 +40,7 @@ public class MetaHubImageProvider : IRemoteImageProvider
         var config = Plugin.Instance!.Configuration;
         var work = await _backend.ResolveAsync(item.ProviderIds, config.PreferredLanguage, cancellationToken)
             .ConfigureAwait(false);
-        if (work is null || !MetaHubMapping.IsMediaTypeEnabled(work.MediaType, config))
+        if (work is null || !_gate.IsServed(item, work.MediaType, config))
             return Enumerable.Empty<RemoteImageInfo>();
 
         var images = await _backend.GetImagesAsync(work.Id, cancellationToken).ConfigureAwait(false);

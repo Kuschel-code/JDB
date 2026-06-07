@@ -60,6 +60,9 @@ public class MetaHubServiceRegistrator : IPluginServiceRegistrator
             o.Password = c.AniDbPassword;
         });
 
+        // Per-item enable/disable gate (resolves library ancestry; ILibraryManager is host-provided).
+        services.AddSingleton<MetaHubItemGate>();
+
         // The backend the providers talk to (embedded or remote, decided per call).
         services.AddSingleton<IMetaHubBackend, MetaHubBackend>();
 
