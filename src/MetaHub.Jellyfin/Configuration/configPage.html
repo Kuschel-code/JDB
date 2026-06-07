@@ -3,197 +3,290 @@
 <head>
     <meta charset="utf-8" />
     <title>MetaHub</title>
+    <style>
+        #metaHubPage .mhHeader { margin: 0 0 1.5em; }
+        #metaHubPage .mhHeader h2 { margin: 0 0 .3em; }
+        #metaHubPage .mhSub { opacity: .7; max-width: 60em; }
+        #metaHubPage .mhPills { display: flex; gap: .5em; margin: 1em 0 1.5em; }
+        #metaHubPage .mhPill { padding: .4em 1em; border-radius: 999px; background: #222; cursor: pointer; opacity: .7; }
+        #metaHubPage .mhPill.mhActive { background: #444; opacity: 1; }
+        #metaHubPage .mhFilter { width: 100%; padding: .8em 1em; margin-bottom: 1.5em; background: #2a2a2a; border: 0; border-radius: 6px; color: #fff; }
+        #metaHubPage .mhRow { display: flex; align-items: center; gap: 1em; padding: .7em 1em; margin-bottom: .6em; background: #1c1c1c; border: 1px solid #2a2a2a; border-radius: 10px; }
+        #metaHubPage .mhRow.mhChild { margin-left: 2.5em; }
+        #metaHubPage .mhThumb { width: 42px; height: 60px; flex: 0 0 auto; border-radius: 4px; background: #333 center/cover no-repeat; }
+        #metaHubPage .mhMeta { flex: 1 1 auto; min-width: 0; }
+        #metaHubPage .mhName { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #metaHubPage .mhHint { opacity: .55; font-size: .85em; }
+        #metaHubPage .mhChevron { cursor: pointer; padding: .2em .6em; opacity: .7; user-select: none; }
+        #metaHubPage .mhSwitch { position: relative; width: 46px; height: 24px; flex: 0 0 auto; }
+        #metaHubPage .mhSwitch input { opacity: 0; width: 0; height: 0; }
+        #metaHubPage .mhSlider { position: absolute; inset: 0; background: #555; border-radius: 999px; transition: .2s; cursor: pointer; }
+        #metaHubPage .mhSlider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+        #metaHubPage .mhSwitch input:checked + .mhSlider { background: #00a4dc; }
+        #metaHubPage .mhSwitch input:checked + .mhSlider:before { transform: translateX(22px); }
+        #metaHubPage .mhSwitch input:disabled + .mhSlider { opacity: .4; cursor: not-allowed; }
+        #metaHubPage .mhMore { width: 100%; padding: .6em; background: #222; border: 0; border-radius: 8px; color: #fff; cursor: pointer; }
+        #metaHubPage .hide { display: none !important; }
+        #metaHubPage .mhCard { background: #1c1c1c; border: 1px solid #2a2a2a; border-radius: 10px; padding: 1.2em; margin-bottom: 1em; }
+    </style>
 </head>
 <body>
-<div id="metaHubConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
-     data-controller="__plugin/metahub">
+<div id="metaHubPage" data-role="page" class="page type-interior pluginConfigurationPage">
     <div data-role="content">
         <div class="content-primary">
 
-            <div class="localnav">
-                <a is="emby-linkbutton" class="ui-btn metaHubTab" data-tab="mode">Mode</a>
-                <a is="emby-linkbutton" class="ui-btn metaHubTab" data-tab="library">Library</a>
-                <a is="emby-linkbutton" class="ui-btn metaHubTab" data-tab="engine">Engine</a>
-                <a is="emby-linkbutton" class="ui-btn metaHubTab" data-tab="about">About</a>
+            <div class="mhHeader">
+                <h2>MetaHub &ndash; Settings</h2>
+                <div class="mhSub">Toggle MetaHub metadata on or off for individual libraries, series, seasons or movies. Data stays in the local database but is not surfaced to Jellyfin when disabled.</div>
             </div>
 
-            <form id="metaHubConfigForm">
+            <div class="mhPills">
+                <div class="mhPill mhActive" data-pill="libraries">Libraries</div>
+                <div class="mhPill" data-pill="engine">Engine</div>
+                <div class="mhPill" data-pill="about">About</div>
+            </div>
 
-                <!-- Mode -->
-                <div class="metaHubSection" data-section="mode">
-                    <label class="checkboxContainer">
-                        <input id="UseEmbeddedEngine" name="UseEmbeddedEngine" type="checkbox" is="emby-checkbox" />
-                        <span>Run embedded (no server / no Docker — uses a local SQLite database)</span>
-                    </label>
-                    <div class="fieldDescription" style="margin-bottom:1.5em;">
-                        Embedded mode runs the whole engine inside Jellyfin. Ingest and enrichment run as
-                        Jellyfin <b>Scheduled Tasks</b> (Dashboard → Scheduled Tasks → MetaHub). Turn this
-                        off only if you run a separate MetaHub server.
-                    </div>
+            <!-- Libraries -->
+            <div class="mhPane" data-pane="libraries">
+                <input id="mhFilter" class="mhFilter" type="text" placeholder="Start typing a name..." />
+                <div id="mhTree"></div>
+                <div id="mhSearchResults" class="hide"></div>
+            </div>
 
-                    <div id="metaHubRemoteBox">
-                        <h3>Remote server (only when embedded is off)</h3>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="ApiBaseUrl">MetaHub API URL</label>
-                            <input id="ApiBaseUrl" name="ApiBaseUrl" type="url" is="emby-input" />
+            <!-- Engine -->
+            <div class="mhPane hide" data-pane="engine">
+                <form id="mhEngineForm">
+                    <div class="mhCard">
+                        <label class="checkboxContainer">
+                            <input id="UseEmbeddedEngine" type="checkbox" is="emby-checkbox" />
+                            <span>Run embedded (local SQLite &mdash; no server / no Docker)</span>
+                        </label>
+                        <div id="mhRemoteBox">
+                            <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="ApiBaseUrl">MetaHub API URL</label><input id="ApiBaseUrl" type="url" is="emby-input" /></div>
+                            <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="ApiKey">API key</label><input id="ApiKey" type="password" is="emby-input" /></div>
+                            <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="RequestTimeoutSeconds">Request timeout (seconds)</label><input id="RequestTimeoutSeconds" type="number" min="1" max="600" is="emby-input" /></div>
                         </div>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="ApiKey">API key</label>
-                            <input id="ApiKey" name="ApiKey" type="password" is="emby-input" />
+                    </div>
+                    <div class="mhCard">
+                        <h3>Content types</h3>
+                        <label class="checkboxContainer"><input id="EnableMovies" type="checkbox" is="emby-checkbox" /><span>Movies</span></label>
+                        <label class="checkboxContainer"><input id="EnableSeries" type="checkbox" is="emby-checkbox" /><span>Series</span></label>
+                        <label class="checkboxContainer"><input id="EnableAnime" type="checkbox" is="emby-checkbox" /><span>Anime</span></label>
+                        <label class="checkboxContainer"><input id="EnableMusic" type="checkbox" is="emby-checkbox" /><span>Music</span></label>
+                        <label class="checkboxContainer"><input id="EnableBooks" type="checkbox" is="emby-checkbox" /><span>Books</span></label>
+                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="PreferredLanguage">Preferred language</label><input id="PreferredLanguage" type="text" is="emby-input" placeholder="de" /></div>
+                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="FallbackLanguage">Fallback language</label><input id="FallbackLanguage" type="text" is="emby-input" placeholder="en" /></div>
+                    </div>
+                    <div class="mhCard">
+                        <h3>Enrichment</h3>
+                        <div class="selectContainer"><label class="selectLabel" for="WriteMode">Write mode</label>
+                            <select is="emby-select" id="WriteMode">
+                                <option value="FillMissingOnly">Fill missing only (keep existing)</option>
+                                <option value="Overwrite">Overwrite existing</option>
+                            </select>
                         </div>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="RequestTimeoutSeconds">Request timeout (seconds)</label>
-                            <input id="RequestTimeoutSeconds" name="RequestTimeoutSeconds" type="number" min="1" max="600" is="emby-input" />
-                        </div>
-                        <button is="emby-button" type="button" class="raised button-cancel block" id="metaHubTestConnection">
-                            <span>Test connection</span>
-                        </button>
-                        <div id="metaHubConnStatus" class="fieldDescription"></div>
+                        <label class="checkboxContainer"><input id="EnrichOnDemand" type="checkbox" is="emby-checkbox" /><span>Enrich on demand (when a work is first matched)</span></label>
+                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="TmdbApiKey">TMDB API key</label><input id="TmdbApiKey" type="password" is="emby-input" /></div>
+                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="GoogleBooksApiKey">Google Books API key</label><input id="GoogleBooksApiKey" type="password" is="emby-input" /></div>
+                        <h3>AniDB identification</h3>
+                        <label class="checkboxContainer"><input id="AniDbEnabled" type="checkbox" is="emby-checkbox" /><span>Enable AniDB file lookup</span></label>
+                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="AniDbClientName">AniDB client name</label><input id="AniDbClientName" type="text" is="emby-input" /></div>
+                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="AniDbClientVersion">AniDB client version</label><input id="AniDbClientVersion" type="number" min="1" is="emby-input" /></div>
+                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="AniDbUsername">AniDB username</label><input id="AniDbUsername" type="text" is="emby-input" /></div>
+                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="AniDbPassword">AniDB password</label><input id="AniDbPassword" type="password" is="emby-input" /></div>
                     </div>
-                </div>
+                    <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
+                </form>
+            </div>
 
-                <!-- Library -->
-                <div class="metaHubSection hide" data-section="library">
-                    <h3>Provide metadata for</h3>
-                    <label class="checkboxContainer"><input id="EnableMovies" type="checkbox" is="emby-checkbox" /><span>Movies</span></label>
-                    <label class="checkboxContainer"><input id="EnableSeries" type="checkbox" is="emby-checkbox" /><span>Series</span></label>
-                    <label class="checkboxContainer"><input id="EnableAnime" type="checkbox" is="emby-checkbox" /><span>Anime</span></label>
-                    <label class="checkboxContainer"><input id="EnableMusic" type="checkbox" is="emby-checkbox" /><span>Music</span></label>
-                    <label class="checkboxContainer"><input id="EnableBooks" type="checkbox" is="emby-checkbox" /><span>Books</span></label>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="PreferredLanguage">Preferred language</label>
-                        <input id="PreferredLanguage" type="text" is="emby-input" placeholder="de" />
-                    </div>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="FallbackLanguage">Fallback language</label>
-                        <input id="FallbackLanguage" type="text" is="emby-input" placeholder="en" />
-                    </div>
-                </div>
-
-                <!-- Engine (embedded) -->
-                <div class="metaHubSection hide" data-section="engine">
-                    <h3>Enrichment</h3>
-                    <div class="selectContainer">
-                        <label class="selectLabel" for="WriteMode">Write mode</label>
-                        <select is="emby-select" id="WriteMode" name="WriteMode">
-                            <option value="FillMissingOnly">Fill missing only (keep existing)</option>
-                            <option value="Overwrite">Overwrite existing</option>
-                        </select>
-                    </div>
-                    <label class="checkboxContainer">
-                        <input id="EnrichOnDemand" type="checkbox" is="emby-checkbox" /><span>Enrich on demand (when a work is first matched)</span>
-                    </label>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="TmdbApiKey">TMDB API key</label>
-                        <input id="TmdbApiKey" type="password" is="emby-input" />
-                    </div>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="GoogleBooksApiKey">Google Books API key</label>
-                        <input id="GoogleBooksApiKey" type="password" is="emby-input" />
-                    </div>
-
-                    <h3>AniDB identification (Shoko core)</h3>
-                    <label class="checkboxContainer">
-                        <input id="AniDbEnabled" type="checkbox" is="emby-checkbox" /><span>Enable AniDB file lookup (requires a registered client + account)</span>
-                    </label>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="AniDbClientName">AniDB client name</label>
-                        <input id="AniDbClientName" type="text" is="emby-input" />
-                    </div>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="AniDbClientVersion">AniDB client version</label>
-                        <input id="AniDbClientVersion" type="number" min="1" is="emby-input" />
-                    </div>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="AniDbUsername">AniDB username</label>
-                        <input id="AniDbUsername" type="text" is="emby-input" />
-                    </div>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="AniDbPassword">AniDB password</label>
-                        <input id="AniDbPassword" type="password" is="emby-input" />
-                    </div>
-                    <div class="fieldDescription">
-                        These settings apply in embedded mode. Run <b>MetaHub: Update anime mappings</b> once,
-                        then <b>MetaHub: Enrich metadata</b> from Dashboard → Scheduled Tasks.
-                    </div>
-                </div>
-
-                <!-- About -->
-                <div class="metaHubSection hide" data-section="about">
+            <!-- About -->
+            <div class="mhPane hide" data-pane="about">
+                <div class="mhCard">
                     <p>MetaHub aggregates cross-linked metadata and artwork for music, movies, series, anime and books.</p>
-                    <p>In embedded mode no external server or Docker is needed — everything runs inside Jellyfin with a local SQLite database, and datasets are fetched from GitHub.</p>
-                    <p><a is="emby-linkbutton" class="button-link" href="https://github.com/kuschel-code/jdb" target="_blank">Project on GitHub</a></p>
+                    <p>In embedded mode everything runs inside Jellyfin with a local SQLite database; datasets are fetched from GitHub. Run <b>MetaHub: Update anime mappings</b> then <b>MetaHub: Enrich metadata</b> from Dashboard &rarr; Scheduled Tasks.</p>
+                    <p><a is="emby-linkbutton" class="button-link" href="https://github.com/Kuschel-code/JDB" target="_blank">Project on GitHub</a></p>
                 </div>
+            </div>
 
-                <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
-            </form>
         </div>
     </div>
 
     <script type="text/javascript">
         (function () {
             var pluginId = 'a3f1c2d4-5b6e-47a8-9c0d-1e2f3a4b5c6d';
-            var page;
+            var page, config, disabled, saveTimer;
 
             var checks = ['UseEmbeddedEngine','EnableMovies','EnableSeries','EnableAnime','EnableMusic','EnableBooks','EnrichOnDemand','AniDbEnabled'];
             var texts = ['ApiBaseUrl','ApiKey','RequestTimeoutSeconds','PreferredLanguage','FallbackLanguage','WriteMode','TmdbApiKey','GoogleBooksApiKey','AniDbClientName','AniDbClientVersion','AniDbUsername','AniDbPassword'];
 
-            function showTab(name) {
-                page.querySelectorAll('.metaHubSection').forEach(function (s) {
-                    s.classList.toggle('hide', s.getAttribute('data-section') !== name);
-                });
-                page.querySelectorAll('.metaHubTab').forEach(function (t) {
-                    t.classList.toggle('ui-btn-active', t.getAttribute('data-tab') === name);
+            function norm(id) { return (id || '').replace(/-/g, '').toLowerCase(); }
+            function isDisabled(id) { return disabled.indexOf(norm(id)) !== -1; }
+            function setDisabled(id, off) {
+                var n = norm(id), i = disabled.indexOf(n);
+                if (off && i === -1) disabled.push(n);
+                if (!off && i !== -1) disabled.splice(i, 1);
+                queueSave();
+            }
+            function queueSave() {
+                clearTimeout(saveTimer);
+                saveTimer = setTimeout(function () {
+                    config.DisabledItemIds = disabled.slice();
+                    ApiClient.updatePluginConfiguration(pluginId, config);
+                }, 300);
+            }
+
+            function showPill(name) {
+                page.querySelectorAll('.mhPane').forEach(function (p) { p.classList.toggle('hide', p.getAttribute('data-pane') !== name); });
+                page.querySelectorAll('.mhPill').forEach(function (t) { t.classList.toggle('mhActive', t.getAttribute('data-pill') === name); });
+            }
+
+            // Build one toggle row. parentOff = an ancestor is disabled (inherited, non-interactive).
+            function row(item, opts) {
+                opts = opts || {};
+                var el = document.createElement('div');
+                el.className = 'mhRow' + (opts.child ? ' mhChild' : '');
+                var parentOff = !!opts.parentOff;
+                var off = parentOff || isDisabled(item.Id);
+
+                var chevron = opts.expandable ? '<div class="mhChevron" data-act="expand">&#9656;</div>' : '';
+                var thumb = '';
+                if (opts.thumb !== false) {
+                    var url = ApiClient.getImageUrl(item.Id, { type: 'Primary', maxHeight: 80 });
+                    thumb = '<div class="mhThumb" style="background-image:url(\'' + url + '\')"></div>';
+                }
+                el.innerHTML =
+                    thumb +
+                    '<div class="mhMeta"><div class="mhName">' + (item.Name || '') + '</div>' +
+                    (opts.hint ? '<div class="mhHint">' + opts.hint + '</div>' : '') + '</div>' +
+                    chevron +
+                    '<label class="mhSwitch"><input type="checkbox"' + (off ? '' : ' checked') + (parentOff ? ' disabled' : '') + ' /><span class="mhSlider"></span></label>';
+
+                var input = el.querySelector('input');
+                input.addEventListener('change', function () { setDisabled(item.Id, !input.checked); });
+
+                var childBox = null;
+                if (opts.expandable) {
+                    childBox = document.createElement('div');
+                    childBox.className = 'hide';
+                    el.querySelector('[data-act=expand]').addEventListener('click', function () {
+                        var willShow = childBox.classList.contains('hide');
+                        childBox.classList.toggle('hide');
+                        this.innerHTML = willShow ? '&#9662;' : '&#9656;';
+                        if (willShow && !childBox.dataset.loaded) {
+                            childBox.dataset.loaded = '1';
+                            opts.loadChildren(childBox, off);
+                        }
+                    });
+                }
+                return { el: el, childBox: childBox };
+            }
+
+            function appendItems(container, items, parentOff) {
+                items.forEach(function (it) {
+                    var expandable = it.Type === 'Series';
+                    var r = row(it, {
+                        child: true,
+                        parentOff: parentOff,
+                        hint: expandable ? 'Expand to manage individual seasons' : '',
+                        expandable: expandable,
+                        loadChildren: function (box, off) {
+                            ApiClient.getItems(ApiClient.getCurrentUserId(), {
+                                ParentId: it.Id, IncludeItemTypes: 'Season', Recursive: false, SortBy: 'SortName'
+                            }).then(function (res) { appendItems(box, res.Items, off || isDisabled(it.Id)); });
+                        }
+                    });
+                    container.appendChild(r.el);
+                    if (r.childBox) container.appendChild(r.childBox);
                 });
             }
 
-            function load(c) {
-                checks.forEach(function (k) { var el = page.querySelector('#' + k); if (el) el.checked = !!c[k]; });
-                texts.forEach(function (k) { var el = page.querySelector('#' + k); if (el) el.value = c[k] != null ? c[k] : ''; });
-                toggleRemote();
+            function loadLibraryPage(library, box, startIndex, parentOff) {
+                ApiClient.getItems(ApiClient.getCurrentUserId(), {
+                    ParentId: library.ItemId, IncludeItemTypes: 'Series,Movie', Recursive: false,
+                    SortBy: 'SortName', StartIndex: startIndex, Limit: 100, Fields: 'PrimaryImageAspectRatio'
+                }).then(function (res) {
+                    var holder = document.createElement('div');
+                    appendItems(holder, res.Items, parentOff);
+                    while (holder.firstChild) box.appendChild(holder.firstChild);
+                    var loaded = startIndex + res.Items.length;
+                    var oldMore = box.querySelector('.mhMore'); if (oldMore) oldMore.remove();
+                    if (loaded < res.TotalRecordCount) {
+                        var more = document.createElement('button');
+                        more.className = 'mhMore'; more.textContent = 'Load more (' + loaded + '/' + res.TotalRecordCount + ')';
+                        more.addEventListener('click', function () { more.remove(); loadLibraryPage(library, box, loaded, parentOff); });
+                        box.appendChild(more);
+                    }
+                });
             }
 
-            function save() {
-                Dashboard.showLoadingMsg();
-                ApiClient.getPluginConfiguration(pluginId).then(function (c) {
-                    checks.forEach(function (k) { var el = page.querySelector('#' + k); if (el) c[k] = el.checked; });
-                    texts.forEach(function (k) { var el = page.querySelector('#' + k); if (el) c[k] = el.value; });
-                    c.RequestTimeoutSeconds = parseInt(c.RequestTimeoutSeconds, 10) || 30;
-                    c.AniDbClientVersion = parseInt(c.AniDbClientVersion, 10) || 1;
-                    ApiClient.updatePluginConfiguration(pluginId, c).then(function (r) {
-                        Dashboard.processPluginConfigurationUpdateResult(r);
+            function renderTree() {
+                var tree = page.querySelector('#mhTree');
+                tree.innerHTML = '';
+                ApiClient.getVirtualFolders().then(function (libs) {
+                    libs.forEach(function (lib) {
+                        var libItem = { Id: lib.ItemId, Name: lib.Name };
+                        var r = row(libItem, {
+                            thumb: false,
+                            hint: 'Expand to manage individual items',
+                            expandable: true,
+                            loadChildren: function (box, off) { loadLibraryPage(lib, box, 0, off || isDisabled(lib.ItemId)); }
+                        });
+                        tree.appendChild(r.el);
+                        if (r.childBox) tree.appendChild(r.childBox);
                     });
                 });
             }
 
-            function toggleRemote() {
-                var embedded = page.querySelector('#UseEmbeddedEngine').checked;
-                page.querySelector('#metaHubRemoteBox').classList.toggle('hide', embedded);
+            var searchTimer;
+            function onFilter(term) {
+                var tree = page.querySelector('#mhTree');
+                var results = page.querySelector('#mhSearchResults');
+                clearTimeout(searchTimer);
+                if (!term) { tree.classList.remove('hide'); results.classList.add('hide'); results.innerHTML = ''; return; }
+                searchTimer = setTimeout(function () {
+                    tree.classList.add('hide'); results.classList.remove('hide');
+                    ApiClient.getItems(ApiClient.getCurrentUserId(), {
+                        SearchTerm: term, IncludeItemTypes: 'Series,Movie', Recursive: true, Limit: 100,
+                        SortBy: 'SortName', Fields: 'PrimaryImageAspectRatio'
+                    }).then(function (res) {
+                        results.innerHTML = '';
+                        appendItems(results, res.Items, false);
+                    });
+                }, 300);
             }
 
-            function testConnection() {
-                var status = page.querySelector('#metaHubConnStatus');
-                var base = (page.querySelector('#ApiBaseUrl').value || '').replace(/\/+$/, '');
-                status.textContent = 'Testing...';
-                fetch(base + '/health')
-                    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
-                    .then(function () { status.textContent = '✓ Connected.'; })
-                    .catch(function (e) { status.textContent = '✗ Could not reach MetaHub (' + e + ').'; });
+            function toggleRemote() { page.querySelector('#mhRemoteBox').classList.toggle('hide', page.querySelector('#UseEmbeddedEngine').checked); }
+
+            function loadEngine() {
+                checks.forEach(function (k) { var el = page.querySelector('#' + k); if (el) el.checked = !!config[k]; });
+                texts.forEach(function (k) { var el = page.querySelector('#' + k); if (el) el.value = config[k] != null ? config[k] : ''; });
+                toggleRemote();
             }
 
-            document.querySelector('#metaHubConfigPage').addEventListener('pageshow', function () {
+            function saveEngine() {
+                Dashboard.showLoadingMsg();
+                checks.forEach(function (k) { var el = page.querySelector('#' + k); if (el) config[k] = el.checked; });
+                texts.forEach(function (k) { var el = page.querySelector('#' + k); if (el) config[k] = el.value; });
+                config.RequestTimeoutSeconds = parseInt(config.RequestTimeoutSeconds, 10) || 30;
+                config.AniDbClientVersion = parseInt(config.AniDbClientVersion, 10) || 1;
+                config.DisabledItemIds = disabled.slice();
+                ApiClient.updatePluginConfiguration(pluginId, config).then(Dashboard.processPluginConfigurationUpdateResult);
+            }
+
+            document.querySelector('#metaHubPage').addEventListener('pageshow', function () {
                 page = this;
                 Dashboard.showLoadingMsg();
-                page.querySelectorAll('.metaHubTab').forEach(function (t) {
-                    t.addEventListener('click', function () { showTab(t.getAttribute('data-tab')); });
-                });
+                page.querySelectorAll('.mhPill').forEach(function (t) { t.addEventListener('click', function () { showPill(t.getAttribute('data-pill')); }); });
+                page.querySelector('#mhFilter').addEventListener('input', function () { onFilter(this.value.trim()); });
                 page.querySelector('#UseEmbeddedEngine').addEventListener('change', toggleRemote);
-                page.querySelector('#metaHubTestConnection').addEventListener('click', testConnection);
-                page.querySelector('#metaHubConfigForm').addEventListener('submit', function (e) {
-                    e.preventDefault(); save(); return false;
-                });
+                page.querySelector('#mhEngineForm').addEventListener('submit', function (e) { e.preventDefault(); saveEngine(); return false; });
                 ApiClient.getPluginConfiguration(pluginId).then(function (c) {
-                    load(c); showTab('mode'); Dashboard.hideLoadingMsg();
+                    config = c;
+                    disabled = (c.DisabledItemIds || []).map(norm);
+                    loadEngine();
+                    renderTree();
+                    showPill('libraries');
+                    Dashboard.hideLoadingMsg();
                 });
             });
         })();
