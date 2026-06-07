@@ -29,6 +29,13 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool EnableMusic { get; set; } = true;
     public bool EnableBooks { get; set; } = true;
 
+    /// <summary>
+    /// Jellyfin item GUIDs ("N" format) of libraries, series, seasons or movies for which
+    /// MetaHub must NOT surface metadata/artwork. Empty = everything enabled (opt-out model).
+    /// Children inherit a disabled ancestor, so only the highest disabled node is stored.
+    /// </summary>
+    public string[] DisabledItemIds { get; set; } = System.Array.Empty<string>();
+
     public string PreferredLanguage { get; set; } = "de";
     public string FallbackLanguage { get; set; } = "en";
 
