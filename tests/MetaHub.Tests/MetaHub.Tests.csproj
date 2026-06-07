@@ -7,11 +7,16 @@
 
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+
+    <!-- The MetaHub.Jellyfin reference pulls in the ASP.NET Core shared framework (via
+         Jellyfin.Controller). Roll forward so the test host runs when the exact
+         Microsoft.AspNetCore.App 9.0 runtime is absent but a newer major is installed. -->
+    <RollForward>Major</RollForward>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.4" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.11" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
     <PackageReference Include="xunit" Version="2.4.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
@@ -31,6 +36,7 @@
     <ProjectReference Include="..\..\src\MetaHub.Identification\MetaHub.Identification.csproj" />
     <ProjectReference Include="..\..\src\MetaHub.Enrichment\MetaHub.Enrichment.csproj" />
     <ProjectReference Include="..\..\src\MetaHub.Export\MetaHub.Export.csproj" />
+    <ProjectReference Include="..\..\src\MetaHub.Jellyfin\MetaHub.Jellyfin.csproj" />
   </ItemGroup>
 
 </Project>
