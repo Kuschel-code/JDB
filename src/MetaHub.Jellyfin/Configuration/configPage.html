@@ -149,17 +149,21 @@
                 var off = parentOff || isDisabled(item.Id);
 
                 var chevron = opts.expandable ? '<div class="mhChevron" data-act="expand">&#9656;</div>' : '';
-                var thumb = '';
-                if (opts.thumb !== false) {
-                    var url = ApiClient.getImageUrl(item.Id, { type: 'Primary', maxHeight: 80 });
-                    thumb = '<div class="mhThumb" style="background-image:url(\'' + url + '\')"></div>';
-                }
+                var hasThumb = opts.thumb !== false;
+                // hint is always a constant we control; item.Name is untrusted (library/series/movie
+                // titles can contain arbitrary characters) so it is set via textContent below, never HTML.
                 el.innerHTML =
-                    thumb +
-                    '<div class="mhMeta"><div class="mhName">' + (item.Name || '') + '</div>' +
+                    (hasThumb ? '<div class="mhThumb"></div>' : '') +
+                    '<div class="mhMeta"><div class="mhName"></div>' +
                     (opts.hint ? '<div class="mhHint">' + opts.hint + '</div>' : '') + '</div>' +
                     chevron +
                     '<label class="mhSwitch"><input type="checkbox"' + (off ? '' : ' checked') + (parentOff ? ' disabled' : '') + ' /><span class="mhSlider"></span></label>';
+
+                el.querySelector('.mhName').textContent = item.Name || '';
+                if (hasThumb) {
+                    var url = ApiClient.getImageUrl(item.Id, { type: 'Primary', maxHeight: 80 });
+                    el.querySelector('.mhThumb').style.backgroundImage = 'url(' + JSON.stringify(url) + ')';
+                }
 
                 var input = el.querySelector('input');
                 input.addEventListener('change', function () { setDisabled(item.Id, !input.checked); });
