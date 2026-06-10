@@ -4,30 +4,28 @@
     <meta charset="utf-8" />
     <title>MetaHub</title>
     <style>
-        #metaHubPage .mhHeader { margin: 0 0 1.5em; }
-        #metaHubPage .mhHeader h2 { margin: 0 0 .3em; }
-        #metaHubPage .mhSub { opacity: .7; max-width: 60em; }
-        #metaHubPage .mhPills { display: flex; gap: .5em; margin: 1em 0 1.5em; }
-        #metaHubPage .mhPill { padding: .4em 1em; border-radius: 999px; background: #222; cursor: pointer; opacity: .7; }
-        #metaHubPage .mhPill.mhActive { background: #444; opacity: 1; }
-        #metaHubPage .mhFilter { width: 100%; padding: .8em 1em; margin-bottom: 1.5em; background: #2a2a2a; border: 0; border-radius: 6px; color: #fff; }
-        #metaHubPage .mhRow { display: flex; align-items: center; gap: 1em; padding: .7em 1em; margin-bottom: .6em; background: #1c1c1c; border: 1px solid #2a2a2a; border-radius: 10px; }
+        /* Theme-friendly: only translucent shades derived from the current theme, no hard-coded
+           dark colors, so the page works on light and dark Jellyfin themes alike. */
+        #metaHubPage .mhCard { background: rgba(128,128,128,.12); border: 1px solid rgba(128,128,128,.18); border-radius: 10px; padding: 1.2em 1.4em; margin-bottom: 1.2em; }
+        #metaHubPage .mhCard h3 { margin-top: 0; }
+        #metaHubPage .mhRow { display: flex; align-items: center; gap: 1em; padding: .7em 1em; margin-bottom: .6em; background: rgba(128,128,128,.12); border: 1px solid rgba(128,128,128,.18); border-radius: 10px; }
         #metaHubPage .mhRow.mhChild { margin-left: 2.5em; }
-        #metaHubPage .mhThumb { width: 42px; height: 60px; flex: 0 0 auto; border-radius: 4px; background: #333 center/cover no-repeat; }
+        #metaHubPage .mhThumb { width: 42px; height: 60px; flex: 0 0 auto; border-radius: 4px; background: rgba(128,128,128,.3) center/cover no-repeat; }
         #metaHubPage .mhMeta { flex: 1 1 auto; min-width: 0; }
         #metaHubPage .mhName { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        #metaHubPage .mhHint { opacity: .55; font-size: .85em; }
+        #metaHubPage .mhHint { opacity: .6; font-size: .85em; }
         #metaHubPage .mhChevron { cursor: pointer; padding: .2em .6em; opacity: .7; user-select: none; }
         #metaHubPage .mhSwitch { position: relative; width: 46px; height: 24px; flex: 0 0 auto; }
         #metaHubPage .mhSwitch input { opacity: 0; width: 0; height: 0; }
-        #metaHubPage .mhSlider { position: absolute; inset: 0; background: #555; border-radius: 999px; transition: .2s; cursor: pointer; }
-        #metaHubPage .mhSlider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+        #metaHubPage .mhSlider { position: absolute; inset: 0; background: rgba(128,128,128,.45); border-radius: 999px; transition: .2s; cursor: pointer; }
+        #metaHubPage .mhSlider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
         #metaHubPage .mhSwitch input:checked + .mhSlider { background: #00a4dc; }
         #metaHubPage .mhSwitch input:checked + .mhSlider:before { transform: translateX(22px); }
         #metaHubPage .mhSwitch input:disabled + .mhSlider { opacity: .4; cursor: not-allowed; }
-        #metaHubPage .mhMore { width: 100%; padding: .6em; background: #222; border: 0; border-radius: 8px; color: #fff; cursor: pointer; }
+        #metaHubPage .mhMore { width: 100%; padding: .6em; background: rgba(128,128,128,.18); border: 0; border-radius: 8px; color: inherit; cursor: pointer; }
+        #metaHubPage .mhSteps li { margin-bottom: .6em; }
+        #metaHubPage .mhStatus { margin-top: .6em; }
         #metaHubPage .hide { display: none !important; }
-        #metaHubPage .mhCard { background: #1c1c1c; border: 1px solid #2a2a2a; border-radius: 10px; padding: 1.2em; margin-bottom: 1em; }
     </style>
 </head>
 <body>
@@ -35,75 +33,193 @@
     <div data-role="content">
         <div class="content-primary">
 
-            <div class="mhHeader">
-                <h2>MetaHub &ndash; Settings</h2>
-                <div class="mhSub">Toggle MetaHub metadata on or off for individual libraries, series, seasons or movies. Data stays in the local database but is not surfaced to Jellyfin when disabled.</div>
+            <h2 style="margin-bottom:.2em;">MetaHub</h2>
+            <p class="fieldDescription" style="max-width:60em;margin-bottom:1.2em;">
+                Aggregated metadata and artwork for movies, series, anime, music and books —
+                running fully inside Jellyfin (no server, no Docker).
+            </p>
+
+            <!-- Native Jellyfin tab bar -->
+            <div class="localnav" style="margin-bottom:1.5em;">
+                <a is="emby-linkbutton" class="ui-btn mhTab ui-btn-active" data-tab="general">General</a>
+                <a is="emby-linkbutton" class="ui-btn mhTab" data-tab="libraries">Libraries</a>
+                <a is="emby-linkbutton" class="ui-btn mhTab" data-tab="sources">Metadata sources</a>
+                <a is="emby-linkbutton" class="ui-btn mhTab" data-tab="help">Help</a>
             </div>
 
-            <div class="mhPills">
-                <div class="mhPill mhActive" data-pill="libraries">Libraries</div>
-                <div class="mhPill" data-pill="engine">Engine</div>
-                <div class="mhPill" data-pill="about">About</div>
-            </div>
-
-            <!-- Libraries -->
-            <div class="mhPane" data-pane="libraries">
-                <input id="mhFilter" class="mhFilter" type="text" placeholder="Start typing a name..." />
-                <div id="mhTree"></div>
-                <div id="mhSearchResults" class="hide"></div>
-            </div>
-
-            <!-- Engine -->
-            <div class="mhPane hide" data-pane="engine">
-                <form id="mhEngineForm">
+            <!-- ============ General ============ -->
+            <div class="mhPane" data-pane="general">
+                <form id="mhGeneralForm">
                     <div class="mhCard">
+                        <h3>Mode</h3>
                         <label class="checkboxContainer">
                             <input id="UseEmbeddedEngine" type="checkbox" is="emby-checkbox" />
-                            <span>Run embedded (local SQLite &mdash; no server / no Docker)</span>
+                            <span>Run embedded (recommended)</span>
                         </label>
-                        <div id="mhRemoteBox">
-                            <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="ApiBaseUrl">MetaHub API URL</label><input id="ApiBaseUrl" type="url" is="emby-input" /></div>
-                            <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="ApiKey">API key</label><input id="ApiKey" type="password" is="emby-input" /></div>
-                            <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="RequestTimeoutSeconds">Request timeout (seconds)</label><input id="RequestTimeoutSeconds" type="number" min="1" max="600" is="emby-input" /></div>
+                        <div class="fieldDescription">
+                            Everything runs inside Jellyfin with a local database. Disable only if you
+                            operate a separate MetaHub server.
+                        </div>
+                        <div id="mhRemoteBox" style="margin-top:1em;">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="ApiBaseUrl">MetaHub server URL</label>
+                                <input id="ApiBaseUrl" type="url" is="emby-input" />
+                                <div class="fieldDescription">e.g. http://localhost:8080</div>
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="ApiKey">API key (optional)</label>
+                                <input id="ApiKey" type="password" is="emby-input" />
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="RequestTimeoutSeconds">Request timeout (seconds)</label>
+                                <input id="RequestTimeoutSeconds" type="number" min="1" max="600" is="emby-input" />
+                            </div>
+                            <button is="emby-button" type="button" class="raised" id="mhTestConnection"><span>Test connection</span></button>
+                            <div id="mhConnStatus" class="fieldDescription mhStatus"></div>
                         </div>
                     </div>
+
                     <div class="mhCard">
                         <h3>Content types</h3>
+                        <div class="fieldDescription" style="margin-bottom:.8em;">
+                            MetaHub only provides metadata and artwork for the selected types.
+                        </div>
                         <label class="checkboxContainer"><input id="EnableMovies" type="checkbox" is="emby-checkbox" /><span>Movies</span></label>
                         <label class="checkboxContainer"><input id="EnableSeries" type="checkbox" is="emby-checkbox" /><span>Series</span></label>
                         <label class="checkboxContainer"><input id="EnableAnime" type="checkbox" is="emby-checkbox" /><span>Anime</span></label>
                         <label class="checkboxContainer"><input id="EnableMusic" type="checkbox" is="emby-checkbox" /><span>Music</span></label>
                         <label class="checkboxContainer"><input id="EnableBooks" type="checkbox" is="emby-checkbox" /><span>Books</span></label>
-                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="PreferredLanguage">Preferred language</label><input id="PreferredLanguage" type="text" is="emby-input" placeholder="de" /></div>
-                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="FallbackLanguage">Fallback language</label><input id="FallbackLanguage" type="text" is="emby-input" placeholder="en" /></div>
                     </div>
+
                     <div class="mhCard">
-                        <h3>Enrichment</h3>
-                        <div class="selectContainer"><label class="selectLabel" for="WriteMode">Write mode</label>
-                            <select is="emby-select" id="WriteMode">
-                                <option value="FillMissingOnly">Fill missing only (keep existing)</option>
-                                <option value="Overwrite">Overwrite existing</option>
-                            </select>
+                        <h3>Language</h3>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="PreferredLanguage">Preferred language</label>
+                            <input id="PreferredLanguage" type="text" is="emby-input" placeholder="de" />
+                            <div class="fieldDescription">Two-letter code (de, en, ja, …). Used for descriptions and artwork selection.</div>
                         </div>
-                        <label class="checkboxContainer"><input id="EnrichOnDemand" type="checkbox" is="emby-checkbox" /><span>Enrich on demand (when a work is first matched)</span></label>
-                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="TmdbApiKey">TMDB API key</label><input id="TmdbApiKey" type="password" is="emby-input" /></div>
-                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="GoogleBooksApiKey">Google Books API key</label><input id="GoogleBooksApiKey" type="password" is="emby-input" /></div>
-                        <h3>AniDB identification</h3>
-                        <label class="checkboxContainer"><input id="AniDbEnabled" type="checkbox" is="emby-checkbox" /><span>Enable AniDB file lookup</span></label>
-                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="AniDbClientName">AniDB client name</label><input id="AniDbClientName" type="text" is="emby-input" /></div>
-                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="AniDbClientVersion">AniDB client version</label><input id="AniDbClientVersion" type="number" min="1" is="emby-input" /></div>
-                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="AniDbUsername">AniDB username</label><input id="AniDbUsername" type="text" is="emby-input" /></div>
-                        <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="AniDbPassword">AniDB password</label><input id="AniDbPassword" type="password" is="emby-input" /></div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="FallbackLanguage">Fallback language</label>
+                            <input id="FallbackLanguage" type="text" is="emby-input" placeholder="en" />
+                            <div class="fieldDescription">Used when the preferred language is not available.</div>
+                        </div>
                     </div>
+
                     <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
                 </form>
             </div>
 
-            <!-- About -->
-            <div class="mhPane hide" data-pane="about">
+            <!-- ============ Libraries (per-item opt-out) ============ -->
+            <div class="mhPane hide" data-pane="libraries">
+                <div class="fieldDescription" style="margin-bottom:1em;">
+                    Toggle MetaHub on or off for individual libraries, series, seasons or movies.
+                    Children inherit a disabled parent. <b>Changes are saved automatically.</b>
+                </div>
+                <div class="inputContainer">
+                    <input id="mhFilter" type="text" is="emby-input" placeholder="Search your library…" />
+                </div>
+                <div id="mhTree"></div>
+                <div id="mhSearchResults" class="hide"></div>
+            </div>
+
+            <!-- ============ Metadata sources ============ -->
+            <div class="mhPane hide" data-pane="sources">
+                <form id="mhSourcesForm">
+                    <div class="mhCard">
+                        <h3>Enrichment</h3>
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="WriteMode">Existing metadata</label>
+                            <select is="emby-select" id="WriteMode">
+                                <option value="FillMissingOnly">Keep — only fill missing fields</option>
+                                <option value="Overwrite">Overwrite with the best source</option>
+                            </select>
+                            <div class="fieldDescription">
+                                "Keep" never changes data you already have; genres and artwork are always added, never removed.
+                            </div>
+                        </div>
+                        <label class="checkboxContainer">
+                            <input id="EnrichOnDemand" type="checkbox" is="emby-checkbox" />
+                            <span>Fetch metadata on demand</span>
+                        </label>
+                        <div class="fieldDescription">
+                            Enrich an item right when it is first matched, instead of waiting for the scheduled task.
+                        </div>
+                    </div>
+
+                    <div class="mhCard">
+                        <h3>API keys (optional)</h3>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="TmdbApiKey">TMDB API key</label>
+                            <input id="TmdbApiKey" type="password" is="emby-input" />
+                            <div class="fieldDescription">
+                                Enables movie/series data from TMDB. Free key at themoviedb.org → Settings → API.
+                                Without a key, TMDB is simply skipped.
+                            </div>
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="GoogleBooksApiKey">Google Books API key</label>
+                            <input id="GoogleBooksApiKey" type="password" is="emby-input" />
+                            <div class="fieldDescription">Optional, improves book lookups. Without a key, Open Library is used.</div>
+                        </div>
+                    </div>
+
+                    <div class="mhCard">
+                        <h3>AniDB file identification</h3>
+                        <div class="fieldDescription" style="margin-bottom:.8em;">
+                            Identifies anime files <b>exactly</b> by file hash (the Shoko principle) instead of
+                            guessing from file names. Requires a free AniDB account and a registered UDP client
+                            (anidb.net → Settings → Clients). AniDB enforces strict rate limits — MetaHub queries
+                            it slowly and caches every answer permanently.
+                        </div>
+                        <label class="checkboxContainer">
+                            <input id="AniDbEnabled" type="checkbox" is="emby-checkbox" />
+                            <span>Enable AniDB lookups</span>
+                        </label>
+                        <div id="mhAniDbBox">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="AniDbClientName">Registered client name</label>
+                                <input id="AniDbClientName" type="text" is="emby-input" />
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="AniDbClientVersion">Client version</label>
+                                <input id="AniDbClientVersion" type="number" min="1" is="emby-input" />
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="AniDbUsername">Username</label>
+                                <input id="AniDbUsername" type="text" is="emby-input" />
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="AniDbPassword">Password</label>
+                                <input id="AniDbPassword" type="password" is="emby-input" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
+                </form>
+            </div>
+
+            <!-- ============ Help ============ -->
+            <div class="mhPane hide" data-pane="help">
                 <div class="mhCard">
-                    <p>MetaHub aggregates cross-linked metadata and artwork for music, movies, series, anime and books.</p>
-                    <p>In embedded mode everything runs inside Jellyfin with a local SQLite database; datasets are fetched from GitHub. Run <b>MetaHub: Update anime mappings</b> then <b>MetaHub: Enrich metadata</b> from Dashboard &rarr; Scheduled Tasks.</p>
+                    <h3>First steps</h3>
+                    <ol class="mhSteps">
+                        <li>Check <b>General</b> — embedded mode on, pick your content types and language.</li>
+                        <li>Open <b>Dashboard → Scheduled Tasks</b> and run <b>MetaHub: Update anime mappings</b> once
+                            (downloads the cross-reference datasets, ~35k anime).</li>
+                        <li>Then run <b>MetaHub: Enrich metadata</b> — it fills in descriptions, genres and artwork.</li>
+                        <li>In your library settings, enable <b>MetaHub</b> as a metadata/image provider and
+                            refresh metadata on a title to see it work.</li>
+                    </ol>
+                </div>
+                <div class="mhCard">
+                    <h3>Good to know</h3>
+                    <ul class="mhSteps">
+                        <li>The database lives in Jellyfin's data folder (<code>metahub/metahub.db</code>).</li>
+                        <li>Both tasks re-run on a schedule automatically (weekly / daily by default) —
+                            adjust them in Scheduled Tasks.</li>
+                        <li>Use the <b>Libraries</b> tab to exclude individual libraries, series, seasons or movies.</li>
+                    </ul>
                     <p><a is="emby-linkbutton" class="button-link" href="https://github.com/Kuschel-code/JDB" target="_blank">Project on GitHub</a></p>
                 </div>
             </div>
@@ -135,9 +251,9 @@
                 }, 300);
             }
 
-            function showPill(name) {
+            function showTab(name) {
                 page.querySelectorAll('.mhPane').forEach(function (p) { p.classList.toggle('hide', p.getAttribute('data-pane') !== name); });
-                page.querySelectorAll('.mhPill').forEach(function (t) { t.classList.toggle('mhActive', t.getAttribute('data-pill') === name); });
+                page.querySelectorAll('.mhTab').forEach(function (t) { t.classList.toggle('ui-btn-active', t.getAttribute('data-tab') === name); });
             }
 
             // Build one toggle row. parentOff = an ancestor is disabled (inherited, non-interactive).
@@ -260,14 +376,26 @@
             }
 
             function toggleRemote() { page.querySelector('#mhRemoteBox').classList.toggle('hide', page.querySelector('#UseEmbeddedEngine').checked); }
+            function toggleAniDb() { page.querySelector('#mhAniDbBox').classList.toggle('hide', !page.querySelector('#AniDbEnabled').checked); }
 
-            function loadEngine() {
+            function testConnection() {
+                var status = page.querySelector('#mhConnStatus');
+                var base = (page.querySelector('#ApiBaseUrl').value || '').replace(/\/+$/, '');
+                status.textContent = 'Testing…';
+                fetch(base + '/health')
+                    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+                    .then(function () { status.textContent = '✓ Connected to MetaHub.'; })
+                    .catch(function (e) { status.textContent = '✗ Could not reach MetaHub (' + e + ').'; });
+            }
+
+            function loadForm() {
                 checks.forEach(function (k) { var el = page.querySelector('#' + k); if (el) el.checked = !!config[k]; });
                 texts.forEach(function (k) { var el = page.querySelector('#' + k); if (el) el.value = config[k] != null ? config[k] : ''; });
                 toggleRemote();
+                toggleAniDb();
             }
 
-            function saveEngine() {
+            function saveForm() {
                 Dashboard.showLoadingMsg();
                 checks.forEach(function (k) { var el = page.querySelector('#' + k); if (el) config[k] = el.checked; });
                 texts.forEach(function (k) { var el = page.querySelector('#' + k); if (el) config[k] = el.value; });
@@ -280,16 +408,19 @@
             document.querySelector('#metaHubPage').addEventListener('pageshow', function () {
                 page = this;
                 Dashboard.showLoadingMsg();
-                page.querySelectorAll('.mhPill').forEach(function (t) { t.addEventListener('click', function () { showPill(t.getAttribute('data-pill')); }); });
+                page.querySelectorAll('.mhTab').forEach(function (t) { t.addEventListener('click', function () { showTab(t.getAttribute('data-tab')); }); });
                 page.querySelector('#mhFilter').addEventListener('input', function () { onFilter(this.value.trim()); });
                 page.querySelector('#UseEmbeddedEngine').addEventListener('change', toggleRemote);
-                page.querySelector('#mhEngineForm').addEventListener('submit', function (e) { e.preventDefault(); saveEngine(); return false; });
+                page.querySelector('#AniDbEnabled').addEventListener('change', toggleAniDb);
+                page.querySelector('#mhTestConnection').addEventListener('click', testConnection);
+                page.querySelector('#mhGeneralForm').addEventListener('submit', function (e) { e.preventDefault(); saveForm(); return false; });
+                page.querySelector('#mhSourcesForm').addEventListener('submit', function (e) { e.preventDefault(); saveForm(); return false; });
                 ApiClient.getPluginConfiguration(pluginId).then(function (c) {
                     config = c;
                     disabled = (c.DisabledItemIds || []).map(norm);
-                    loadEngine();
+                    loadForm();
                     renderTree();
-                    showPill('libraries');
+                    showTab('general');
                     Dashboard.hideLoadingMsg();
                 });
             });
