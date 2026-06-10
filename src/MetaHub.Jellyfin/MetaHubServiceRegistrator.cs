@@ -64,6 +64,7 @@ public class MetaHubServiceRegistrator : IPluginServiceRegistrator
         services.AddSingleton<MetaHubItemGate>();
 
         // The backend the providers talk to (embedded or remote, decided per call).
+        services.AddSingleton<Func<Configuration.PluginConfiguration>>(_ => () => Plugin.Instance!.Configuration);
         services.AddSingleton<IMetaHubBackend, MetaHubBackend>();
 
         // Creates the SQLite schema on startup when running embedded.

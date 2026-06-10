@@ -16,14 +16,19 @@ public class MetaHubBackend : IMetaHubBackend
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly Func<Configuration.PluginConfiguration> _configAccessor;
 
-    public MetaHubBackend(IServiceScopeFactory scopeFactory, IHttpClientFactory httpClientFactory)
+    public MetaHubBackend(
+        IServiceScopeFactory scopeFactory,
+        IHttpClientFactory httpClientFactory,
+        Func<Configuration.PluginConfiguration> configAccessor)
     {
         _scopeFactory = scopeFactory;
         _httpClientFactory = httpClientFactory;
+        _configAccessor = configAccessor;
     }
 
-    private static Configuration.PluginConfiguration Config => Plugin.Instance!.Configuration;
+    private Configuration.PluginConfiguration Config => _configAccessor();
 
     public async Task<WorkDto?> ResolveAsync(
         IReadOnlyDictionary<string, string> providerIds, string? lang, CancellationToken ct)
