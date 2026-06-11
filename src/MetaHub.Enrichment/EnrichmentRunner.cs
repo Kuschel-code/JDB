@@ -33,7 +33,8 @@ public class EnrichmentRunner
         bool forceRefresh = false,
         bool onlyMissing = false,
         EnrichmentWriteMode? writeMode = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        IProgress<double>? progress = null)
     {
         var query = _db.Works.Where(w => w.MediaType == MediaType.Anime);
         if (onlyMissing)
@@ -46,12 +47,15 @@ public class EnrichmentRunner
             .ToListAsync(ct);
 
         var enriched = 0;
+        var done = 0;
         foreach (var id in ids)
         {
             ct.ThrowIfCancellationRequested();
             var result = await _service.EnrichAsync(id, forceRefresh, writeMode, ct);
             if (result.Applied.Count > 0)
                 enriched++;
+            done++;
+            progress?.Report(100.0 * done / ids.Count);
 
             if (delayMs > 0)
                 await Task.Delay(delayMs, ct);

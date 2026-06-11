@@ -27,7 +27,25 @@ public class MetaHubMovieProvider : IRemoteMetadataProvider<Movie, MovieInfo>
         var config = Plugin.Instance!.Configuration;
         var work = await _backend.ResolveAsync(info.ProviderIds, config.PreferredLanguage, cancellationToken)
             .ConfigureAwait(false);
-        if (work is null || !_gate.IsServed(info, work.MediaType, config))
+
+        // No provider id matched — fall back to title matching (lookup name, then file/folder name).
+        work ??= await _backend.ResolveByNameAsync(
+                MetaHubMapping.NameCandidates(info), info.Year, config.PreferredLanguage, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (work is null)
+        {
+            // Last resort: supply the cleaned file/folder name so titles are never empty.
+            var folderTitle = MetaHubMapping.FolderTitle(info.Path);
+            if (!string.IsNullOrWhiteSpace(folderTitle) && _gate.IsServed(info, "Movie", config))
+            {
+                result.HasMetadata = true;
+                result.Item = new Movie { Name = folderTitle, ProductionYear = info.Year };
+            }
+            return result;
+        }
+
+        if (!_gate.IsServed(info, work.MediaType, config))
             return result;
 
         result.HasMetadata = true;

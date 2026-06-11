@@ -27,7 +27,26 @@ public class MetaHubSeriesProvider : IRemoteMetadataProvider<Series, SeriesInfo>
         var config = Plugin.Instance!.Configuration;
         var work = await _backend.ResolveAsync(info.ProviderIds, config.PreferredLanguage, cancellationToken)
             .ConfigureAwait(false);
-        if (work is null || !_gate.IsServed(info, work.MediaType, config))
+
+        // No provider id matched — fall back to title matching (lookup name, then folder name).
+        work ??= await _backend.ResolveByNameAsync(
+                MetaHubMapping.NameCandidates(info), info.Year, config.PreferredLanguage, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (work is null)
+        {
+            // Last resort (user request): when nothing matches, at least supply the folder
+            // name as the title so items never keep empty/garbage names.
+            var folderTitle = MetaHubMapping.FolderTitle(info.Path);
+            if (!string.IsNullOrWhiteSpace(folderTitle) && _gate.IsServed(info, "Series", config))
+            {
+                result.HasMetadata = true;
+                result.Item = new Series { Name = folderTitle, ProductionYear = info.Year };
+            }
+            return result;
+        }
+
+        if (!_gate.IsServed(info, work.MediaType, config))
             return result;
 
         result.HasMetadata = true;
