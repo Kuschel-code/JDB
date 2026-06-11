@@ -176,6 +176,68 @@ public class AnimeIngestService
         return result;
     }
 
+    /// <summary>
+    /// Merges kawaiioverflow/arm rows onto existing works (matched by MAL or AniList id),
+    /// adding the Japanese database ids (Annict, Syoboi Calendar).
+    /// </summary>
+    public async Task<IngestResult> MergeArmAsync(IEnumerable<ArmEntry> entries, CancellationToken ct = default)
+    {
+        var result = new IngestResult();
+
+        var byMal = await _db.ExternalIds
+            .Where(x => x.Source == ExternalIdSource.Mal)
+            .ToDictionaryAsync(x => x.ExternalValue, x => x.WorkId, ct);
+        var byAniList = await _db.ExternalIds
+            .Where(x => x.Source == ExternalIdSource.AniList)
+            .ToDictionaryAsync(x => x.ExternalValue, x => x.WorkId, ct);
+
+        var existing = (await _db.ExternalIds
+                .Where(x => x.Source == ExternalIdSource.Annict || x.Source == ExternalIdSource.Syobocal)
+                .Select(x => new { x.Source, x.ExternalValue })
+                .ToListAsync(ct))
+            .Select(x => Key(x.Source, x.ExternalValue))
+            .ToHashSet();
+
+        foreach (var row in entries)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            Guid workId;
+            if (row.MalId is { } mal && byMal.TryGetValue(mal.ToString(), out var wid1))
+                workId = wid1;
+            else if (row.AniListId is { } al && byAniList.TryGetValue(al.ToString(), out var wid2))
+                workId = wid2;
+            else
+            {
+                result.Skipped++;
+                continue;
+            }
+
+            void TryAdd(ExternalIdSource source, int? value)
+            {
+                if (value is null) return;
+                var key = Key(source, value.Value.ToString());
+                if (!existing.Add(key)) return;
+                _db.ExternalIds.Add(new ExternalId
+                {
+                    WorkId = workId,
+                    Source = source,
+                    ExternalValue = value.Value.ToString()
+                });
+                result.ExternalIdsAdded++;
+            }
+
+            TryAdd(ExternalIdSource.Annict, row.AnnictId);
+            TryAdd(ExternalIdSource.Syobocal, row.SyobocalTid);
+            result.Updated++;
+        }
+
+        await _db.SaveChangesAsync(ct);
+        _log.LogInformation("ARM merge done: {Updated} matched, {Ids} Japanese-db ids added, {Skipped} skipped",
+            result.Updated, result.ExternalIdsAdded, result.Skipped);
+        return result;
+    }
+
     private static void ApplyEntry(Work work, ManamiEntry entry)
     {
         if (!string.IsNullOrWhiteSpace(entry.Title))

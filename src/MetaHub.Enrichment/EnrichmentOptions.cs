@@ -34,4 +34,7 @@ public class EnrichmentOptions
     // Provider API keys (optional; providers that need a key are skipped when it is empty).
     public string TmdbApiKey { get; set; } = string.Empty;
     public string GoogleBooksApiKey { get; set; } = string.Empty;
+
+    /// <summary>Annict personal access token (annict.com) for Japanese anime metadata.</summary>
+    public string AnnictToken { get; set; } = string.Empty;
 }

@@ -8,7 +8,11 @@ using MetaHub.Jellyfin.Api;
 
 namespace MetaHub.Jellyfin.Providers;
 
-/// <summary>Supplies artwork for movies and series, backed by the embedded engine or a remote API.</summary>
+/// <summary>
+/// Supplies artwork for movies, series and seasons, backed by the embedded engine or a remote
+/// API. Seasons fall back to the owning series' artwork (poster/backdrop), the common
+/// convention when no season-specific art exists.
+/// </summary>
 public class MetaHubImageProvider : IRemoteImageProvider
 {
     private readonly IMetaHubBackend _backend;
@@ -24,27 +28,26 @@ public class MetaHubImageProvider : IRemoteImageProvider
 
     public string Name => "MetaHub";
 
-    public bool Supports(BaseItem item) => item is Series or Movie;
+    public bool Supports(BaseItem item) => item is Series or Movie or Season;
 
-    public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[]
-    {
-        ImageType.Primary,
-        ImageType.Backdrop,
-        ImageType.Banner,
-        ImageType.Logo,
-        ImageType.Thumb
-    };
+    public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => item is Season
+        ? new[] { ImageType.Primary, ImageType.Backdrop, ImageType.Thumb }
+        : new[] { ImageType.Primary, ImageType.Backdrop, ImageType.Banner, ImageType.Logo, ImageType.Thumb };
 
     public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
     {
         var config = Plugin.Instance!.Configuration;
-        var work = await _backend.ResolveAsync(item.ProviderIds, config.PreferredLanguage, cancellationToken)
+
+        // Seasons have no provider ids of their own — use the owning series'.
+        var providerIds = item is Season { Series: { } parent } ? parent.ProviderIds : item.ProviderIds;
+
+        var work = await _backend.ResolveAsync(providerIds, config.PreferredLanguage, cancellationToken)
             .ConfigureAwait(false);
         if (work is null || !_gate.IsServed(item, work.MediaType, config))
             return Enumerable.Empty<RemoteImageInfo>();
 
         var images = await _backend.GetImagesAsync(work.Id, cancellationToken).ConfigureAwait(false);
-        return images.Select(img => new RemoteImageInfo
+        var result = images.Select(img => new RemoteImageInfo
         {
             ProviderName = Name,
             Url = img.Url,
@@ -53,6 +56,12 @@ public class MetaHubImageProvider : IRemoteImageProvider
             Height = img.Height,
             Language = img.Lang
         });
+
+        // For seasons only image types Jellyfin accepts on a season make sense.
+        if (item is Season)
+            result = result.Where(i => i.Type is ImageType.Primary or ImageType.Backdrop or ImageType.Thumb);
+
+        return result;
     }
 
     public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)

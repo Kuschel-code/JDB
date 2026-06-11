@@ -43,22 +43,8 @@ public class MetaHubBackend : IMetaHubBackend
         var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
 
         Work? work = null;
-        foreach (var (source, id) in ProviderIdMapper.Candidates(providerIds))
-        {
-            if (!TryMapSource(source, out var src))
-                continue;
-
-            var workId = await db.ExternalIds
-                .Where(x => x.Source == src && x.ExternalValue == id)
-                .Select(x => (Guid?)x.WorkId)
-                .FirstOrDefaultAsync(ct).ConfigureAwait(false);
-
-            if (workId is { } wid)
-            {
-                work = await LoadWorkAsync(db, wid, ct).ConfigureAwait(false);
-                break;
-            }
-        }
+        if (await FindWorkIdAsync(db, providerIds, ct).ConfigureAwait(false) is { } wid)
+            work = await LoadWorkAsync(db, wid, ct).ConfigureAwait(false);
 
         if (work is null)
             return null;
@@ -106,6 +92,88 @@ public class MetaHubBackend : IMetaHubBackend
                 Score = i.Score
             })
             .ToListAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task<EpisodeDto?> GetEpisodeAsync(
+        IReadOnlyDictionary<string, string> seriesProviderIds, int? seasonNumber, int? episodeNumber,
+        CancellationToken ct)
+    {
+        if (episodeNumber is null)
+            return null;
+
+        if (!Config.UseEmbeddedEngine)
+        {
+            var client = new MetaHubApiClient(_httpClientFactory);
+            var series = await MetaHubMapping.ResolveAsync(client, seriesProviderIds, null, ct).ConfigureAwait(false);
+            if (series is null)
+                return null;
+
+            var episodes = await client.GetEpisodesAsync(series.Id, ct).ConfigureAwait(false);
+            var match = episodes.FirstOrDefault(e =>
+                            e.SeasonNumber == (seasonNumber ?? 1) && e.EpisodeNumber == episodeNumber)
+                        ?? episodes.FirstOrDefault(e => e.AbsoluteNumber == episodeNumber);
+            if (match is not null)
+                match.SeriesMediaType = series.MediaType;
+            return match;
+        }
+
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+
+        var workId = await FindWorkIdAsync(db, seriesProviderIds, ct).ConfigureAwait(false);
+        if (workId is null)
+            return null;
+
+        var mediaType = await db.Works.Where(w => w.Id == workId)
+            .Select(w => w.MediaType.ToString())
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? string.Empty;
+
+        var season = seasonNumber ?? 1;
+        var episode = await db.Episodes.AsNoTracking()
+                          .FirstOrDefaultAsync(e => e.SeriesWorkId == workId
+                                                    && e.SeasonNumber == season
+                                                    && e.EpisodeNumber == episodeNumber, ct)
+                          .ConfigureAwait(false)
+                      // Anime libraries often use absolute numbering.
+                      ?? await db.Episodes.AsNoTracking()
+                          .FirstOrDefaultAsync(e => e.SeriesWorkId == workId
+                                                    && e.AbsoluteNumber == episodeNumber, ct)
+                          .ConfigureAwait(false);
+
+        if (episode is null)
+            return null;
+
+        return new EpisodeDto
+        {
+            SeasonNumber = episode.SeasonNumber,
+            EpisodeNumber = episode.EpisodeNumber,
+            AbsoluteNumber = episode.AbsoluteNumber,
+            Title = episode.Title,
+            Overview = episode.Overview,
+            AirDate = episode.AirDate,
+            SeriesMediaType = mediaType
+        };
+    }
+
+    /// <summary>Finds the work referenced by any of the item's provider ids, in preference order.</summary>
+    private static async Task<Guid?> FindWorkIdAsync(
+        MetaHubDbContext db, IReadOnlyDictionary<string, string> providerIds, CancellationToken ct)
+    {
+        foreach (var (source, id) in ProviderIdMapper.Candidates(providerIds))
+        {
+            if (!TryMapSource(source, out var src))
+                continue;
+
+            var workId = await db.ExternalIds
+                .Where(x => x.Source == src && x.ExternalValue == id)
+                .Select(x => (Guid?)x.WorkId)
+                .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+
+            if (workId is { } wid)
+                return wid;
+        }
+
+        return null;
     }
 
     private static Task<Work?> LoadWorkAsync(MetaHubDbContext db, Guid id, CancellationToken ct)

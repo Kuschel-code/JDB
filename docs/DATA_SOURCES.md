@@ -61,6 +61,14 @@ Additional:
 - **anisearch.com**, **LiveChart.me**, **Notify.moe**, **anime-planet.com** — already
   carried as cross-IDs by manami; useful as additional enrichment targets.
 - **Shikimori** ⚠️ — Russian/EN anime/manga DB with rich relations.
+
+Japanese sources (native titles, Japanese episode data):
+- **Annict** 🔑 — Japanese anime database/tracker (annict.com); GraphQL API with personal
+  access token. **(Integrated: AnnictProvider, linked via the ARM mapping.)**
+- **Syoboi Calendar** 🆓 — Japanese TV anime schedule DB (cal.syoboi.jp); TIDs are ingested
+  via ARM, episode endpoint is a future enrichment candidate.
+- **MediaArts DB (メディア芸術データベース)** 🆓 — Japanese government anime/manga database.
+- **kawaiioverflow/arm** 🆓 — mapping dataset MAL/AniList ↔ Annict/Syobocal. **(Used in ingest.)**
 - **metachan-api** 🆓 — community project unifying anime & manga metadata (self-hostable).
 
 ## Books

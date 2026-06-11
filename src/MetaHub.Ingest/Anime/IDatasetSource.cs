@@ -8,4 +8,5 @@ public interface IDatasetSource
 {
     Task<Stream> OpenManamiAsync(CancellationToken ct = default);
     Task<Stream> OpenFribbAsync(CancellationToken ct = default);
+    Task<Stream> OpenArmAsync(CancellationToken ct = default);
 }

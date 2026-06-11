@@ -53,6 +53,9 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Google Books API key (optional).</summary>
     public string GoogleBooksApiKey { get; set; } = string.Empty;
 
+    /// <summary>Annict personal access token (annict.com) for Japanese anime metadata (optional).</summary>
+    public string AnnictToken { get; set; } = string.Empty;
+
     // --- Embedded engine: AniDB identification (Shoko core) ---
 
     public bool AniDbEnabled { get; set; }

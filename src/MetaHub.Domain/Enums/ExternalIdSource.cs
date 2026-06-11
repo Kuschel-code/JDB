@@ -23,6 +23,10 @@ public enum ExternalIdSource
     Notify = 15,
     AniSearch = 16,
     LiveChart = 17,
+    /// <summary>Annict (annict.com) — Japanese anime database/tracker.</summary>
+    Annict = 18,
+    /// <summary>Syoboi Calendar (cal.syoboi.jp) TID — Japanese TV anime schedule database.</summary>
+    Syobocal = 19,
 
     // Music
     MusicBrainz = 30,

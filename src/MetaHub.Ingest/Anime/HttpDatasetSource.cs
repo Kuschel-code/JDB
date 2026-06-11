@@ -23,6 +23,8 @@ public class HttpDatasetSource : IDatasetSource
 
     public Task<Stream> OpenFribbAsync(CancellationToken ct = default) => OpenAsync(_options.FribbUrl, ct);
 
+    public Task<Stream> OpenArmAsync(CancellationToken ct = default) => OpenAsync(_options.ArmUrl, ct);
+
     private async Task<Stream> OpenAsync(string url, CancellationToken ct)
     {
         var client = _factory.CreateClient(HttpClientName);
