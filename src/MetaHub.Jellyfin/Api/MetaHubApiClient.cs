@@ -70,6 +70,23 @@ public class MetaHubApiClient
         }
     }
 
+    public async Task<IReadOnlyList<EpisodeDto>> GetEpisodesAsync(Guid workId, CancellationToken ct)
+    {
+        var client = CreateClient();
+        try
+        {
+            var response = await client.GetAsync($"{BaseUrl}/api/series/{workId}/episodes", ct).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+                return Array.Empty<EpisodeDto>();
+            return await response.Content.ReadFromJsonAsync<List<EpisodeDto>>(JsonOptions, ct).ConfigureAwait(false)
+                   ?? new List<EpisodeDto>();
+        }
+        catch (Exception)
+        {
+            return Array.Empty<EpisodeDto>();
+        }
+    }
+
     public async Task<IReadOnlyList<ImageDto>> GetImagesAsync(Guid workId, CancellationToken ct)
     {
         var client = CreateClient();

@@ -17,6 +17,13 @@ public class AnimeIngestOptions
     public string FribbUrl { get; set; } =
         "https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-list-full.json";
 
+    /// <summary>
+    /// kawaiioverflow/arm mapping (MAL/AniList ↔ Annict/Syoboi Calendar) — links works to the
+    /// Japanese metadata databases.
+    /// </summary>
+    public string ArmUrl { get; set; } =
+        "https://raw.githubusercontent.com/kawaiioverflow/arm/master/arm.json";
+
     /// <summary>Contact string used in the User-Agent, per provider etiquette.</summary>
     public string UserAgent { get; set; } = "MetaHub/0.1 (+https://github.com/kuschel-code/jdb)";
 }

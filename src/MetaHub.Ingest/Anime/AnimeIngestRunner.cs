@@ -39,6 +39,20 @@ public class AnimeIngestRunner
                     ?? new List<FribbEntry>();
         var fribbResult = await _service.MergeFribbAsync(fribb, ct);
 
+        // Japanese database ids (Annict / Syoboi Calendar) via the ARM mapping — best effort,
+        // the core ingest stays usable when the extra dataset is unavailable.
+        try
+        {
+            await using var armStream = await _source.OpenArmAsync(ct);
+            var arm = await JsonSerializer.DeserializeAsync<List<ArmEntry>>(armStream, JsonOptions, ct)
+                      ?? new List<ArmEntry>();
+            await _service.MergeArmAsync(arm, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _log.LogWarning(ex, "ARM (Japanese db) mapping merge failed; continuing without it");
+        }
+
         return (manamiResult, fribbResult);
     }
 }

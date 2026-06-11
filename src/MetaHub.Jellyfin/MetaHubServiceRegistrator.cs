@@ -44,6 +44,7 @@ public class MetaHubServiceRegistrator : IPluginServiceRegistrator
             if (c is null) return;
             o.TmdbApiKey = c.TmdbApiKey;
             o.GoogleBooksApiKey = c.GoogleBooksApiKey;
+            o.AnnictToken = c.AnnictToken;
             o.PreferredLanguage = c.PreferredLanguage;
             if (Enum.TryParse<EnrichmentWriteMode>(c.WriteMode, true, out var mode))
                 o.WriteMode = mode;

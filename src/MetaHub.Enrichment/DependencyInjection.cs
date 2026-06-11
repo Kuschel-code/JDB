@@ -22,6 +22,7 @@ public static class DependencyInjection
         AddResilientClient(services, MusicBrainzProvider.HttpClientName);
         AddResilientClient(services, OpenLibraryProvider.HttpClientName);
         AddResilientClient(services, GoogleBooksProvider.HttpClientName);
+        AddResilientClient(services, AnnictProvider.HttpClientName);
 
         // Anime
         services.AddScoped<IMetadataProvider, AniListProvider>();
@@ -33,7 +34,10 @@ public static class DependencyInjection
         // Books
         services.AddScoped<IMetadataProvider, OpenLibraryProvider>();
         services.AddScoped<IMetadataProvider, GoogleBooksProvider>();
+        // Japanese anime database (token-gated)
+        services.AddScoped<IMetadataProvider, AnnictProvider>();
 
+        services.AddScoped<JikanEpisodeSync>();
         services.AddScoped<EnrichmentService>();
         services.AddScoped<EnrichmentRunner>();
 

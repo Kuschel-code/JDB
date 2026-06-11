@@ -20,16 +20,20 @@ public class EnrichmentService
     private readonly EnrichmentOptions _options;
     private readonly ILogger<EnrichmentService> _log;
 
+    private readonly JikanEpisodeSync? _episodeSync;
+
     public EnrichmentService(
         MetaHubDbContext db,
         IEnumerable<IMetadataProvider> providers,
         IOptions<EnrichmentOptions> options,
-        ILogger<EnrichmentService> log)
+        ILogger<EnrichmentService> log,
+        JikanEpisodeSync? episodeSync = null)
     {
         _db = db;
         _providers = providers.OrderBy(p => p.Priority).ToList();
         _options = options.Value;
         _log = log;
+        _episodeSync = episodeSync;
     }
 
     public async Task<EnrichmentResult> EnrichAsync(
@@ -98,7 +102,37 @@ public class EnrichmentService
             await _db.SaveChangesAsync(ct);
         }
 
+        await SyncEpisodesIfMissingAsync(work, forceRefresh, ct);
+
         return result;
+    }
+
+    /// <summary>
+    /// Best-effort: fill the episode table for anime via Jikan when episodes are missing
+    /// (or stale relative to the known episode count). Failures never break enrichment.
+    /// </summary>
+    private async Task SyncEpisodesIfMissingAsync(Work work, bool force, CancellationToken ct)
+    {
+        if (_episodeSync is null || work.MediaType != MediaType.Anime)
+            return;
+
+        var malId = work.ExternalIds.FirstOrDefault(x => x.Source == ExternalIdSource.Mal)?.ExternalValue;
+        if (string.IsNullOrWhiteSpace(malId))
+            return;
+
+        try
+        {
+            var have = await _db.Episodes.CountAsync(e => e.SeriesWorkId == work.Id, ct);
+            var expected = work.SeriesDetail?.EpisodeCount ?? 0;
+            if (!force && have > 0 && (expected == 0 || have >= expected))
+                return;
+
+            await _episodeSync.SyncAsync(_db, work, malId!, _options.PreferredLanguage, ct);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Episode sync failed for work {WorkId}", work.Id);
+        }
     }
 
     private async Task<string?> GetCachedBodyAsync(Guid workId, ExternalIdSource source, TimeSpan ttl, CancellationToken ct)

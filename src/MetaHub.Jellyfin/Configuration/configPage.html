@@ -161,6 +161,16 @@
                             <input id="GoogleBooksApiKey" type="password" is="emby-input" />
                             <div class="fieldDescription">Optional, improves book lookups. Without a key, Open Library is used.</div>
                         </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="AnnictToken">Annict access token (Japanese metadata)</label>
+                            <input id="AnnictToken" type="password" is="emby-input" />
+                            <div class="fieldDescription">
+                                Adds Japanese titles and artwork from annict.com, the Japanese anime database.
+                                Free personal token at annict.com → Settings → Applications. Without a token,
+                                Annict is skipped. Tip: set the preferred language to <code>ja</code> to also get
+                                Japanese episode titles.
+                            </div>
+                        </div>
                     </div>
 
                     <div class="mhCard">
@@ -219,6 +229,8 @@
                         <li>Both tasks re-run on a schedule automatically (weekly / daily by default) —
                             adjust them in Scheduled Tasks.</li>
                         <li>Use the <b>Libraries</b> tab to exclude individual libraries, series, seasons or movies.</li>
+                        <li>MetaHub also serves <b>seasons and episodes</b> — enable it under the season/episode
+                            metadata downloaders and image fetchers in your library settings.</li>
                     </ul>
                     <p><a is="emby-linkbutton" class="button-link" href="https://github.com/Kuschel-code/JDB" target="_blank">Project on GitHub</a></p>
                 </div>
@@ -233,7 +245,7 @@
             var page, config, disabled, saveTimer;
 
             var checks = ['UseEmbeddedEngine','EnableMovies','EnableSeries','EnableAnime','EnableMusic','EnableBooks','EnrichOnDemand','AniDbEnabled'];
-            var texts = ['ApiBaseUrl','ApiKey','RequestTimeoutSeconds','PreferredLanguage','FallbackLanguage','WriteMode','TmdbApiKey','GoogleBooksApiKey','AniDbClientName','AniDbClientVersion','AniDbUsername','AniDbPassword'];
+            var texts = ['ApiBaseUrl','ApiKey','RequestTimeoutSeconds','PreferredLanguage','FallbackLanguage','WriteMode','TmdbApiKey','GoogleBooksApiKey','AnnictToken','AniDbClientName','AniDbClientVersion','AniDbUsername','AniDbPassword'];
 
             function norm(id) { return (id || '').replace(/-/g, '').toLowerCase(); }
             function isDisabled(id) { return disabled.indexOf(norm(id)) !== -1; }
