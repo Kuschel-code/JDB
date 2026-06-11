@@ -39,6 +39,7 @@ public class MetaHubSeriesProvider : IRemoteMetadataProvider<Series, SeriesInfo>
             ProductionYear = work.ReleaseYear
         };
         MetaHubMapping.ApplyProviderIds(result.Item, work);
+        MetaHubMapping.ApplyPeople(result, work);
         return result;
     }
 

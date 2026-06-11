@@ -1,6 +1,8 @@
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Model.Entities;
 using JellyfinImageType = MediaBrowser.Model.Entities.ImageType;
+using PersonKind = global::Jellyfin.Data.Enums.PersonKind;
+using PersonInfo = MediaBrowser.Controller.Entities.PersonInfo;
 
 namespace MetaHub.Jellyfin.Api;
 
@@ -32,6 +34,36 @@ public static class MetaHubMapping
             "book" => config.EnableBooks,
             _ => true
         };
+
+    /// <summary>Adds the work's cast/crew to the metadata result (actors, directors, …).</summary>
+    public static void ApplyPeople<T>(MediaBrowser.Controller.Providers.MetadataResult<T> result, WorkDto work)
+        where T : BaseItem
+    {
+        foreach (var person in work.People)
+        {
+            var kind = person.Role switch
+            {
+                "Actor" or "VoiceActor" => PersonKind.Actor,
+                "Director" => PersonKind.Director,
+                "Writer" => PersonKind.Writer,
+                "Author" => PersonKind.Author,
+                "Producer" => PersonKind.Producer,
+                "Composer" => PersonKind.Composer,
+                "Artist" => PersonKind.Artist,
+                _ => PersonKind.Unknown
+            };
+            if (kind == PersonKind.Unknown || string.IsNullOrWhiteSpace(person.Name))
+                continue;
+
+            result.AddPerson(new PersonInfo
+            {
+                Name = person.Name,
+                Type = kind,
+                Role = person.Character ?? string.Empty,
+                ImageUrl = person.ImageUrl
+            });
+        }
+    }
 
     /// <summary>Copies MetaHub cross-ids back onto the Jellyfin item.</summary>
     public static void ApplyProviderIds(BaseItem item, WorkDto work)

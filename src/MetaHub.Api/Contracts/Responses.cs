@@ -11,9 +11,13 @@ public record WorkResponse(
     int? ReleaseYear,
     string? Overview,
     WorkStatus Status,
-    IReadOnlyList<ExternalIdResponse> ExternalIds);
+    IReadOnlyList<ExternalIdResponse> ExternalIds,
+    IReadOnlyList<PersonResponse> People);
 
 public record ExternalIdResponse(string Source, string Value);
+
+/// <summary>A cast/crew member (actor, voice actor, director, author, ...).</summary>
+public record PersonResponse(string Name, string Role, string? Character, string? ImageUrl, int Order);
 
 public record ImageResponse(string Type, string Url, string? Lang, int? Width, int? Height, string? Source, double Score);
 

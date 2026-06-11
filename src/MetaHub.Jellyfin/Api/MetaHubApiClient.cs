@@ -115,6 +115,18 @@ public class WorkDto
     public string? Overview { get; set; }
     public string Status { get; set; } = string.Empty;
     public List<ExternalIdDto> ExternalIds { get; set; } = new();
+    public List<PersonDto> People { get; set; } = new();
+}
+
+/// <summary>A cast/crew member of a work (actor, voice actor, director, author, …).</summary>
+public class PersonDto
+{
+    public string Name { get; set; } = string.Empty;
+    /// <summary>MetaHub CreditRole name, e.g. "Actor", "VoiceActor", "Director".</summary>
+    public string Role { get; set; } = string.Empty;
+    public string? Character { get; set; }
+    public string? ImageUrl { get; set; }
+    public int Order { get; set; }
 }
 
 public class ExternalIdDto

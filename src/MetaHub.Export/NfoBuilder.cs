@@ -91,6 +91,28 @@ public static class NfoBuilder
         foreach (var genre in work.WorkGenres.Select(wg => wg.Genre?.Name).Where(n => !string.IsNullOrWhiteSpace(n)))
             root.Add(new XElement("genre", genre));
 
+        // Cast & crew. Kodi/Jellyfin NFO conventions: <actor> blocks, <director>, <credits>.
+        foreach (var credit in work.Credits.Where(c => c.Person is not null).OrderBy(c => c.Order))
+        {
+            switch (credit.Role)
+            {
+                case CreditRole.Actor or CreditRole.VoiceActor:
+                    var actor = new XElement("actor", new XElement("name", credit.Person!.Name));
+                    if (!string.IsNullOrWhiteSpace(credit.Character))
+                        actor.Add(new XElement("role", credit.Character));
+                    if (!string.IsNullOrWhiteSpace(credit.Person.ImageUrl))
+                        actor.Add(new XElement("thumb", credit.Person.ImageUrl));
+                    root.Add(actor);
+                    break;
+                case CreditRole.Director:
+                    root.Add(new XElement("director", credit.Person!.Name));
+                    break;
+                case CreditRole.Writer or CreditRole.Author:
+                    root.Add(new XElement("credits", credit.Person!.Name));
+                    break;
+            }
+        }
+
         foreach (var poster in work.Images.Where(i => i.Type == ImageType.Poster).OrderByDescending(i => i.Score))
             root.Add(new XElement("thumb", new XAttribute("aspect", "poster"), poster.Url));
         foreach (var backdrop in work.Images.Where(i => i.Type == ImageType.Backdrop).OrderByDescending(i => i.Score))

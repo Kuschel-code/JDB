@@ -26,6 +26,7 @@ public class NfoExportService
             .Include(w => w.ExternalIds)
             .Include(w => w.Images)
             .Include(w => w.WorkGenres).ThenInclude(wg => wg.Genre)
+            .Include(w => w.Credits).ThenInclude(c => c.Person)
             .Include(w => w.SeriesDetail)
             .Include(w => w.MusicDetail)
             .Include(w => w.BookDetail)

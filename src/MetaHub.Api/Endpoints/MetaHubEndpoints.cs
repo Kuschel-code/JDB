@@ -45,6 +45,8 @@ public static class MetaHubEndpoints
     {
         var work = await db.Works
             .Include(w => w.ExternalIds)
+            .Include(w => w.Credits).ThenInclude(c => c.Person)
+            .AsSplitQuery()
             .AsNoTracking()
             .FirstOrDefaultAsync(w => w.Id == id, ct);
 
@@ -86,6 +88,8 @@ public static class MetaHubEndpoints
 
         var work = await db.Works
             .Include(w => w.ExternalIds)
+            .Include(w => w.Credits).ThenInclude(c => c.Person)
+            .AsSplitQuery()
             .AsNoTracking()
             .FirstOrDefaultAsync(
                 w => w.ExternalIds.Any(x => x.Source == src && x.ExternalValue == id), ct);
@@ -283,7 +287,13 @@ public static class MetaHubEndpoints
 
         return new WorkResponse(
             w.Id, w.MediaType, w.CanonicalTitle, w.OriginalTitle, w.ReleaseYear, overview, w.Status,
-            w.ExternalIds.Select(x => new ExternalIdResponse(x.Source.ToString(), x.ExternalValue)).ToList());
+            w.ExternalIds.Select(x => new ExternalIdResponse(x.Source.ToString(), x.ExternalValue)).ToList(),
+            w.Credits
+                .OrderBy(c => c.Order)
+                .Where(c => c.Person is not null)
+                .Select(c => new PersonResponse(
+                    c.Person!.Name, c.Role.ToString(), c.Character, c.Person.ImageUrl, c.Order))
+                .ToList());
     }
 
     private static bool TryParseSource(string source, out ExternalIdSource parsed)

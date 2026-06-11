@@ -58,6 +58,68 @@ public class WorkMerger
         await ApplyDetailAsync(work, ordered, writeMode, ct);
         await ApplyGenresAsync(work, ordered, ct);
         ApplyImages(work, ordered, preferredLanguage);
+        await ApplyCreditsAsync(work, ordered, ct);
+    }
+
+    /// <summary>
+    /// Upserts cast/crew: people are de-duplicated by name, credits by (work, person, role).
+    /// Additive — existing credits are kept; the highest-priority provider supplying credits wins
+    /// for ordering/character info on conflict.
+    /// </summary>
+    private async Task ApplyCreditsAsync(Work work, IReadOnlyList<NormalizedWorkData> ordered, CancellationToken ct)
+    {
+        var incoming = ordered.SelectMany(d => d.Credits).ToList();
+        if (incoming.Count == 0)
+            return;
+
+        var existingCredits = await _db.Credits
+            .Include(c => c.Person)
+            .Where(c => c.WorkId == work.Id)
+            .ToListAsync(ct);
+
+        // People already known by name (case-insensitive), across the whole database.
+        var names = incoming.Select(c => c.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var people = (await _db.People.Where(p => names.Contains(p.Name)).ToListAsync(ct))
+            .GroupBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var credit in incoming)
+        {
+            if (string.IsNullOrWhiteSpace(credit.Name) || credit.Role == CreditRole.Unknown)
+                continue;
+
+            if (!people.TryGetValue(credit.Name, out var person))
+            {
+                person = new Person { Name = credit.Name, ImageUrl = credit.ImageUrl };
+                _db.People.Add(person);
+                people[credit.Name] = person;
+            }
+            else if (string.IsNullOrWhiteSpace(person.ImageUrl) && !string.IsNullOrWhiteSpace(credit.ImageUrl))
+            {
+                person.ImageUrl = credit.ImageUrl;
+            }
+
+            var existing = existingCredits.FirstOrDefault(c =>
+                c.Role == credit.Role &&
+                (c.PersonId == person.Id ||
+                 string.Equals(c.Person?.Name, credit.Name, StringComparison.OrdinalIgnoreCase)));
+            if (existing is not null)
+            {
+                existing.Character ??= credit.Character;
+                continue;
+            }
+
+            var entity = new Credit
+            {
+                WorkId = work.Id,
+                Person = person,
+                Role = credit.Role,
+                Character = credit.Character,
+                Order = credit.Order
+            };
+            _db.Credits.Add(entity);
+            existingCredits.Add(entity);
+        }
     }
 
     private async Task ApplyDetailAsync(

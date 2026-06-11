@@ -177,7 +177,12 @@ public class MetaHubBackend : IMetaHubBackend
     }
 
     private static Task<Work?> LoadWorkAsync(MetaHubDbContext db, Guid id, CancellationToken ct)
-        => db.Works.Include(w => w.ExternalIds).AsNoTracking().FirstOrDefaultAsync(w => w.Id == id, ct);
+        => db.Works
+            .Include(w => w.ExternalIds)
+            .Include(w => w.Credits).ThenInclude(c => c.Person)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(w => w.Id == id, ct);
 
     private static WorkDto ToDto(Work work, string? lang)
     {
@@ -198,6 +203,18 @@ public class MetaHubBackend : IMetaHubBackend
             Status = work.Status.ToString(),
             ExternalIds = work.ExternalIds
                 .Select(x => new ExternalIdDto { Source = x.Source.ToString(), Value = x.ExternalValue })
+                .ToList(),
+            People = work.Credits
+                .OrderBy(c => c.Order)
+                .Where(c => c.Person is not null)
+                .Select(c => new PersonDto
+                {
+                    Name = c.Person!.Name,
+                    Role = c.Role.ToString(),
+                    Character = c.Character,
+                    ImageUrl = c.Person.ImageUrl,
+                    Order = c.Order
+                })
                 .ToList()
         };
     }
