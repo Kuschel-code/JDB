@@ -29,7 +29,7 @@ public class MetaHubEnrichTask : IScheduledTask
         var runner = scope.ServiceProvider.GetRequiredService<EnrichmentRunner>();
         await runner.EnrichAnimeAsync(
             maxItems: 500, delayMs: 500, forceRefresh: false, onlyMissing: true,
-            writeMode: null, ct: cancellationToken).ConfigureAwait(false);
+            writeMode: null, ct: cancellationToken, progress: progress).ConfigureAwait(false);
         progress.Report(100);
     }
 

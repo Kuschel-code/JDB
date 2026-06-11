@@ -94,6 +94,56 @@ public class MetaHubBackend : IMetaHubBackend
             .ToListAsync(ct).ConfigureAwait(false);
     }
 
+    public async Task<WorkDto?> ResolveByNameAsync(
+        IEnumerable<string> nameCandidates, int? year, string? lang, CancellationToken ct)
+    {
+        var names = nameCandidates
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Select(n => n.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (names.Count == 0)
+            return null;
+
+        if (!Config.UseEmbeddedEngine)
+        {
+            // Remote mode: title lookup is not exposed as a dedicated endpoint yet.
+            return null;
+        }
+
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+
+        foreach (var name in names)
+        {
+            var lowered = name.ToLowerInvariant();
+            var matches = await db.Works
+                .Where(w => w.CanonicalTitle.ToLower() == lowered
+                            || (w.OriginalTitle != null && w.OriginalTitle.ToLower() == lowered))
+                .Select(w => new { w.Id, w.ReleaseYear })
+                .Take(5)
+                .ToListAsync(ct).ConfigureAwait(false);
+
+            if (matches.Count == 0)
+                continue;
+
+            // Disambiguate by year when several works share the title (remakes etc.).
+            var pick = matches.Count == 1
+                ? matches[0]
+                : year is { } y
+                    ? matches.FirstOrDefault(m => m.ReleaseYear == y)
+                    : null;
+            if (pick is null)
+                continue;
+
+            var work = await LoadWorkAsync(db, pick.Id, ct).ConfigureAwait(false);
+            if (work is not null)
+                return ToDto(work, lang);
+        }
+
+        return null;
+    }
+
     public async Task<EpisodeDto?> GetEpisodeAsync(
         IReadOnlyDictionary<string, string> seriesProviderIds, int? seasonNumber, int? episodeNumber,
         CancellationToken ct)

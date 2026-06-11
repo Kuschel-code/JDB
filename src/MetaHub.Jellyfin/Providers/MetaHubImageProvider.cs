@@ -28,15 +28,23 @@ public class MetaHubImageProvider : IRemoteImageProvider
 
     public string Name => "MetaHub";
 
-    public bool Supports(BaseItem item) => item is Series or Movie or Season;
+    public bool Supports(BaseItem item) => item is Series or Movie or Season or Episode;
 
-    public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => item is Season
-        ? new[] { ImageType.Primary, ImageType.Backdrop, ImageType.Thumb }
-        : new[] { ImageType.Primary, ImageType.Backdrop, ImageType.Banner, ImageType.Logo, ImageType.Thumb };
+    public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => item switch
+    {
+        Season => new[] { ImageType.Primary, ImageType.Backdrop, ImageType.Thumb },
+        Episode => new[] { ImageType.Primary, ImageType.Thumb },
+        _ => new[] { ImageType.Primary, ImageType.Backdrop, ImageType.Banner, ImageType.Logo, ImageType.Thumb }
+    };
 
     public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
     {
         var config = Plugin.Instance!.Configuration;
+
+        // Episode stills are not stored yet (future: TMDB/AniDB episode images); MetaHub is
+        // listed under the episode image fetchers but currently supplies nothing for them.
+        if (item is Episode)
+            return Enumerable.Empty<RemoteImageInfo>();
 
         // Seasons have no provider ids of their own — use the owning series'.
         var providerIds = item is Season { Series: { } parent } ? parent.ProviderIds : item.ProviderIds;

@@ -25,19 +25,23 @@ public class AnimeIngestRunner
         _log = log;
     }
 
-    public async Task<(IngestResult Manami, IngestResult Fribb)> RunAsync(CancellationToken ct = default)
+    public async Task<(IngestResult Manami, IngestResult Fribb)> RunAsync(
+        CancellationToken ct = default, IProgress<double>? progress = null)
     {
         _log.LogInformation("Starting anime ingest (manami + Fribb)...");
+        progress?.Report(5);
 
         await using var manamiStream = await _source.OpenManamiAsync(ct);
         var dataset = await JsonSerializer.DeserializeAsync<ManamiDataset>(manamiStream, JsonOptions, ct)
                       ?? new ManamiDataset();
         var manamiResult = await _service.IngestManamiAsync(dataset, ct);
+        progress?.Report(60);
 
         await using var fribbStream = await _source.OpenFribbAsync(ct);
         var fribb = await JsonSerializer.DeserializeAsync<List<FribbEntry>>(fribbStream, JsonOptions, ct)
                     ?? new List<FribbEntry>();
         var fribbResult = await _service.MergeFribbAsync(fribb, ct);
+        progress?.Report(85);
 
         // Japanese database ids (Annict / Syoboi Calendar) via the ARM mapping — best effort,
         // the core ingest stays usable when the extra dataset is unavailable.

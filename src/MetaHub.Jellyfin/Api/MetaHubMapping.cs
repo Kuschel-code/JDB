@@ -35,6 +35,32 @@ public static class MetaHubMapping
             _ => true
         };
 
+    /// <summary>
+    /// Title candidates for name-based matching: the lookup name first, then the cleaned
+    /// folder/file name from the item's path (libraries are usually organized by title).
+    /// </summary>
+    public static IReadOnlyList<string> NameCandidates(MediaBrowser.Controller.Providers.ItemLookupInfo info)
+    {
+        var candidates = new List<string>(2);
+        if (!string.IsNullOrWhiteSpace(info.Name))
+            candidates.Add(info.Name.Trim());
+        if (FolderTitle(info.Path) is { } folder && !candidates.Contains(folder, StringComparer.OrdinalIgnoreCase))
+            candidates.Add(folder);
+        return candidates;
+    }
+
+    /// <summary>The cleaned title from the last path segment (folder or file name), or null.</summary>
+    public static string? FolderTitle(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return null;
+        var leaf = System.IO.Path.GetFileName(path.TrimEnd('/', '\\'));
+        if (string.IsNullOrWhiteSpace(leaf))
+            return null;
+        var parsed = MetaHub.Identification.Naming.FilenameParser.Parse(leaf);
+        return string.IsNullOrWhiteSpace(parsed.Title) ? null : parsed.Title;
+    }
+
     /// <summary>Adds the work's cast/crew to the metadata result (actors, directors, …).</summary>
     public static void ApplyPeople<T>(MediaBrowser.Controller.Providers.MetadataResult<T> result, WorkDto work)
         where T : BaseItem

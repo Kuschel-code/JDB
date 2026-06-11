@@ -10,6 +10,14 @@ public interface IMetaHubBackend
     Task<WorkDto?> ResolveAsync(
         IReadOnlyDictionary<string, string> providerIds, string? lang, CancellationToken ct);
 
+    /// <summary>
+    /// Resolves a work by title when no provider id matched. Tries each candidate name in
+    /// order against canonical and original titles (case-insensitive); a year, when given,
+    /// disambiguates multiple matches. Returns null when no unambiguous match exists.
+    /// </summary>
+    Task<WorkDto?> ResolveByNameAsync(
+        IEnumerable<string> nameCandidates, int? year, string? lang, CancellationToken ct);
+
     /// <summary>Returns the artwork for a resolved work.</summary>
     Task<IReadOnlyList<ImageDto>> GetImagesAsync(Guid workId, CancellationToken ct);
 

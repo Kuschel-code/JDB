@@ -27,7 +27,7 @@ public class MetaHubIngestTask : IScheduledTask
         progress.Report(0);
         using var scope = _scopeFactory.CreateScope();
         var runner = scope.ServiceProvider.GetRequiredService<AnimeIngestRunner>();
-        await runner.RunAsync(cancellationToken).ConfigureAwait(false);
+        await runner.RunAsync(cancellationToken, progress).ConfigureAwait(false);
         progress.Report(100);
     }
 
