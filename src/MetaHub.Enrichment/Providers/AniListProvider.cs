@@ -25,6 +25,18 @@ query ($id: Int) {
     genres
     coverImage { extraLarge color }
     bannerImage
+    characters(sort: [ROLE, RELEVANCE], perPage: 15) {
+      edges {
+        node { name { full } image { large } }
+        voiceActors(language: JAPANESE) { name { full } image { large } }
+      }
+    }
+    staff(sort: RELEVANCE, perPage: 10) {
+      edges {
+        role
+        node { name { full } image { large } }
+      }
+    }
   }
 }";
 
@@ -90,6 +102,8 @@ query ($id: Int) {
             foreach (var g in genres.EnumerateArray())
                 if (g.GetString() is { } name) data.Genres.Add(name);
 
+        ParseCredits(media, data);
+
         if (media.TryGetProperty("coverImage", out var cover) && GetString(cover, "extraLarge") is { } poster)
             data.Images.Add(new NormalizedImage { Type = ImageType.Poster, Url = poster, Source = "anilist", Score = 80 });
 
@@ -98,6 +112,79 @@ query ($id: Int) {
 
         return data;
     }
+
+    // Voice actors (with their character) and key staff (director, composer, …).
+    private static void ParseCredits(JsonElement media, NormalizedWorkData data)
+    {
+        var order = 0;
+        if (media.TryGetProperty("characters", out var characters) &&
+            characters.TryGetProperty("edges", out var charEdges) &&
+            charEdges.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var edge in charEdges.EnumerateArray())
+            {
+                var character = edge.TryGetProperty("node", out var charNode) ? FullName(charNode) : null;
+                if (!edge.TryGetProperty("voiceActors", out var actors) || actors.ValueKind != JsonValueKind.Array)
+                    continue;
+
+                foreach (var actor in actors.EnumerateArray())
+                {
+                    if (FullName(actor) is not { } name)
+                        continue;
+                    data.Credits.Add(new NormalizedCredit
+                    {
+                        Name = name,
+                        Role = CreditRole.VoiceActor,
+                        Character = character,
+                        ImageUrl = ImageLarge(actor),
+                        Order = order++
+                    });
+                }
+            }
+        }
+
+        if (media.TryGetProperty("staff", out var staff) &&
+            staff.TryGetProperty("edges", out var staffEdges) &&
+            staffEdges.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var edge in staffEdges.EnumerateArray())
+            {
+                if (!edge.TryGetProperty("node", out var node) || FullName(node) is not { } name)
+                    continue;
+
+                var roleText = GetString(edge, "role") ?? string.Empty;
+                data.Credits.Add(new NormalizedCredit
+                {
+                    Name = name,
+                    Role = MapStaffRole(roleText),
+                    Character = null,
+                    ImageUrl = ImageLarge(node),
+                    Order = order++
+                });
+            }
+        }
+    }
+
+    private static CreditRole MapStaffRole(string role)
+    {
+        var r = role.ToLowerInvariant();
+        if (r.Contains("director")) return CreditRole.Director;
+        if (r.Contains("music") || r.Contains("composer")) return CreditRole.Composer;
+        if (r.Contains("original creator") || r.Contains("original story") || r.Contains("script")
+            || r.Contains("series composition")) return CreditRole.Writer;
+        if (r.Contains("producer")) return CreditRole.Producer;
+        return CreditRole.Unknown;
+    }
+
+    private static string? FullName(JsonElement el)
+        => el.ValueKind == JsonValueKind.Object && el.TryGetProperty("name", out var name)
+           && name.ValueKind == JsonValueKind.Object
+            ? GetString(name, "full") : null;
+
+    private static string? ImageLarge(JsonElement el)
+        => el.ValueKind == JsonValueKind.Object && el.TryGetProperty("image", out var image)
+           && image.ValueKind == JsonValueKind.Object
+            ? GetString(image, "large") : null;
 
     private static WorkStatus MapStatus(string? status) => status?.ToUpperInvariant() switch
     {

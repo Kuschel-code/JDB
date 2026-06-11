@@ -38,7 +38,8 @@ public class TmdbProvider : IMetadataProvider
             return null;
 
         var kind = work.MediaType == MediaType.Movie ? "movie" : "tv";
-        var url = $"https://api.themoviedb.org/3/{kind}/{externalId}?api_key={_options.TmdbApiKey}";
+        var url = $"https://api.themoviedb.org/3/{kind}/{externalId}" +
+                  $"?api_key={_options.TmdbApiKey}&append_to_response=credits";
 
         var client = _factory.CreateClient(HttpClientName);
         var response = await client.GetAsync(url, ct);
@@ -72,12 +73,66 @@ public class TmdbProvider : IMetadataProvider
             foreach (var g in genres.EnumerateArray())
                 if (GetString(g, "name") is { } name) data.Genres.Add(name);
 
+        ParseCredits(d, data);
+
         if (GetString(d, "poster_path") is { } poster)
             data.Images.Add(new NormalizedImage { Type = ImageType.Poster, Url = ImageBase + poster, Source = "tmdb", Score = 90 });
         if (GetString(d, "backdrop_path") is { } backdrop)
             data.Images.Add(new NormalizedImage { Type = ImageType.Backdrop, Url = ImageBase + backdrop, Source = "tmdb", Score = 90 });
 
         return data;
+    }
+
+    // Cast (top-billed) + key crew from append_to_response=credits.
+    private static void ParseCredits(JsonElement d, NormalizedWorkData data)
+    {
+        if (!d.TryGetProperty("credits", out var credits) || credits.ValueKind != JsonValueKind.Object)
+            return;
+
+        if (credits.TryGetProperty("cast", out var cast) && cast.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var member in cast.EnumerateArray().Take(20))
+            {
+                if (GetString(member, "name") is not { } name)
+                    continue;
+                data.Credits.Add(new NormalizedCredit
+                {
+                    Name = name,
+                    Role = CreditRole.Actor,
+                    Character = GetString(member, "character"),
+                    ImageUrl = GetString(member, "profile_path") is { } p ? ImageBase + p : null,
+                    Order = member.TryGetProperty("order", out var o) && o.ValueKind == JsonValueKind.Number
+                        ? o.GetInt32() : int.MaxValue
+                });
+            }
+        }
+
+        if (credits.TryGetProperty("crew", out var crew) && crew.ValueKind == JsonValueKind.Array)
+        {
+            var order = 1000; // crew after the cast
+            foreach (var member in crew.EnumerateArray())
+            {
+                if (GetString(member, "name") is not { } name)
+                    continue;
+                var role = GetString(member, "job")?.ToLowerInvariant() switch
+                {
+                    "director" => CreditRole.Director,
+                    "screenplay" or "writer" or "story" => CreditRole.Writer,
+                    "producer" or "executive producer" => CreditRole.Producer,
+                    "original music composer" or "music" => CreditRole.Composer,
+                    _ => CreditRole.Unknown
+                };
+                if (role == CreditRole.Unknown)
+                    continue;
+                data.Credits.Add(new NormalizedCredit
+                {
+                    Name = name,
+                    Role = role,
+                    ImageUrl = GetString(member, "profile_path") is { } p ? ImageBase + p : null,
+                    Order = order++
+                });
+            }
+        }
     }
 
     private static int? YearOf(string? date)

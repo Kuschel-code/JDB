@@ -23,6 +23,7 @@ public class NormalizedWorkData
     public WorkStatus? Status { get; set; }
     public List<string> Genres { get; } = new();
     public List<NormalizedImage> Images { get; } = new();
+    public List<NormalizedCredit> Credits { get; } = new();
 
     // Series / anime
     public int? SeasonCount { get; set; }
@@ -40,6 +41,17 @@ public class NormalizedWorkData
     public string? Publisher { get; set; }
     public string? SeriesName { get; set; }
     public double? SeriesIndex { get; set; }
+}
+
+/// <summary>A cast or crew credit as reported by a provider (actor, director, author, …).</summary>
+public class NormalizedCredit
+{
+    public required string Name { get; init; }
+    public required CreditRole Role { get; init; }
+    /// <summary>The character portrayed, for acting/voice roles.</summary>
+    public string? Character { get; init; }
+    public string? ImageUrl { get; init; }
+    public int Order { get; init; }
 }
 
 public class NormalizedImage

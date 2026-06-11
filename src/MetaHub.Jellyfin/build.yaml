@@ -15,5 +15,6 @@ artifacts:
   - "MetaHub.Jellyfin.dll"
 changelog: >
   0.1.7.1 - MetaHub now appears for seasons and episodes too (metadata + image providers);
-  episode data is filled from Jikan (Japanese titles with preferred language "ja"); new
-  Japanese sources: Annict provider (token) and Annict/Syoboi ids via the ARM mapping.
+  episode data from Jikan (Japanese titles with preferred language "ja"); cast & crew
+  (voice actors with characters, directors, composers, writers) from AniList/TMDB, shown in
+  Jellyfin and exported to NFO; Japanese sources: Annict provider + ARM id mapping.
