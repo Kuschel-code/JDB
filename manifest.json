@@ -6,7 +6,7 @@
     "overview": "Self-hosted media metadata aggregator for Jellyfin (music, movies, series, anime, books).",
     "owner": "kuschel-code",
     "category": "Metadata",
-    "imageUrl": "",
+    "imageUrl": "https://raw.githubusercontent.com/Kuschel-code/JDB/main/assets/logo.png",
     "versions": [
       {
         "version": "0.1.7.0",

@@ -78,6 +78,38 @@ public class AnimeIngestServiceTests
     }
 
     [Fact]
+    public async Task IngestManami_stores_dataset_poster_for_works_without_art()
+    {
+        await using var db = NewDb();
+        var service = new AnimeIngestService(db, NullLogger<AnimeIngestService>.Instance);
+
+        var dataset = new ManamiDataset
+        {
+            Data =
+            {
+                new ManamiEntry
+                {
+                    Title = "Cowboy Bebop",
+                    Episodes = 26,
+                    Picture = "https://cdn.myanimelist.net/images/anime/4/19644.jpg",
+                    Thumbnail = "https://cdn.myanimelist.net/images/anime/4/19644t.jpg",
+                    Sources = { "https://anidb.net/anime/23" }
+                }
+            }
+        };
+
+        var first = await service.IngestManamiAsync(dataset);
+        Assert.Equal(1, first.ImagesAdded);
+        Assert.Equal(1, await db.Images.CountAsync(i => i.Type == ImageType.Poster && i.Source == "manami"));
+        Assert.Equal(1, await db.Images.CountAsync(i => i.Type == ImageType.Thumb));
+
+        // Re-run must not duplicate artwork.
+        var second = await service.IngestManamiAsync(dataset);
+        Assert.Equal(0, second.ImagesAdded);
+        Assert.Equal(2, await db.Images.CountAsync());
+    }
+
+    [Fact]
     public async Task MergeFribb_adds_tvdb_tmdb_imdb_by_anidb_id()
     {
         await using var db = NewDb();
