@@ -38,6 +38,12 @@ public class AnimeIngestService
         // Works created during this run, so multiple entries sharing an id reuse one work.
         var created = new Dictionary<Guid, Work>();
 
+        // Works that already have artwork — manami ships a poster/thumbnail URL per anime,
+        // which we store for works without any image so every entry has art right after
+        // ingest (before enrichment ever runs).
+        var worksWithImages = (await _db.Images.Select(i => i.WorkId).Distinct().ToListAsync(ct))
+            .ToHashSet();
+
         foreach (var entry in dataset.Data)
         {
             ct.ThrowIfCancellationRequested();
@@ -84,6 +90,31 @@ public class AnimeIngestService
             }
 
             ApplyEntry(work, entry);
+
+            if (!worksWithImages.Contains(work.Id) && !string.IsNullOrWhiteSpace(entry.Picture))
+            {
+                _db.Images.Add(new Image
+                {
+                    WorkId = work.Id,
+                    Type = ImageType.Poster,
+                    Url = entry.Picture!,
+                    Source = "manami",
+                    Score = 50
+                });
+                if (!string.IsNullOrWhiteSpace(entry.Thumbnail) && entry.Thumbnail != entry.Picture)
+                {
+                    _db.Images.Add(new Image
+                    {
+                        WorkId = work.Id,
+                        Type = ImageType.Thumb,
+                        Url = entry.Thumbnail!,
+                        Source = "manami",
+                        Score = 40
+                    });
+                }
+                worksWithImages.Add(work.Id);
+                result.ImagesAdded++;
+            }
 
             // Add any ids this work does not have yet, keeping the index in sync.
             foreach (var (source, value) in ids)
@@ -282,5 +313,6 @@ public class IngestResult
     public int Created { get; set; }
     public int Updated { get; set; }
     public int ExternalIdsAdded { get; set; }
+    public int ImagesAdded { get; set; }
     public int Skipped { get; set; }
 }

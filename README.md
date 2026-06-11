@@ -1,3 +1,5 @@
+<img src="assets/logo.png" alt="JDB logo" width="120" align="right" />
+
 # JDB — MetaHub
 
 **Jellyfin Meta DB** — a self-hosted media metadata aggregator (.NET / C#).
