@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Kuschel-code/JDB/main/assets/logo.png",
     "versions": [
       {
+        "version": "0.1.7.5",
+        "changelog": "Release v0.1.7.5",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/Kuschel-code/JDB/releases/download/v0.1.7.5/metahub-jellyfin-plugin-v0.1.7.5.zip",
+        "checksum": "14673c72932f2b75ebc7dea20d6c8f4b",
+        "timestamp": "2026-06-14T22:36:24Z"
+      },
+      {
         "version": "0.1.7.4",
         "changelog": "Release v0.1.7.4",
         "targetAbi": "10.11.0.0",
