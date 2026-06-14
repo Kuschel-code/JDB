@@ -1,3 +1,5 @@
+using MetaHub.Domain.Enums;
+
 namespace MetaHub.Jellyfin.Api;
 
 /// <summary>
@@ -12,11 +14,13 @@ public interface IMetaHubBackend
 
     /// <summary>
     /// Resolves a work by title when no provider id matched. Tries each candidate name in
-    /// order against canonical and original titles (case-insensitive); a year, when given,
-    /// disambiguates multiple matches. Returns null when no unambiguous match exists.
+    /// order against canonical and original titles (case-insensitive, punctuation-insensitive so
+    /// "227" matches "22/7"); a year, when given, disambiguates multiple matches. When
+    /// <paramref name="preferredType"/> is set (from the item's library), only works of that
+    /// media type are considered. Returns null when no unambiguous match exists.
     /// </summary>
     Task<WorkDto?> ResolveByNameAsync(
-        IEnumerable<string> nameCandidates, int? year, string? lang, CancellationToken ct);
+        IEnumerable<string> nameCandidates, int? year, MediaType? preferredType, string? lang, CancellationToken ct);
 
     /// <summary>Returns the artwork for a resolved work.</summary>
     Task<IReadOnlyList<ImageDto>> GetImagesAsync(Guid workId, CancellationToken ct);

@@ -36,6 +36,15 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public string[] DisabledItemIds { get; set; } = System.Array.Empty<string>();
 
+    /// <summary>
+    /// Per-library media-type overrides as "&lt;libraryItemId "N"&gt;=&lt;MediaType&gt;" entries
+    /// (e.g. "0c41907140d802bb58430fed7e2cd79e=Anime"). When a library is not listed, MetaHub
+    /// infers the type from the library name (anime/series/movie/music/book, German + English).
+    /// Used so name-based matching prefers the right work — e.g. the anime "22/7" over the US
+    /// series "227" in a library named "Anime".
+    /// </summary>
+    public string[] LibraryTypeOverrides { get; set; } = System.Array.Empty<string>();
+
     public string PreferredLanguage { get; set; } = "de";
     public string FallbackLanguage { get; set; } = "en";
 

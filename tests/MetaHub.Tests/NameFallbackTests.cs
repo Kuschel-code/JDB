@@ -57,30 +57,30 @@ public class NameFallbackTests
                 sp.GetRequiredService<IHttpClientFactory>(),
                 () => new PluginConfiguration { UseEmbeddedEngine = true, EnrichOnDemand = false });
 
-            // Case-insensitive canonical title match (the folder name).
+            // Case-insensitive canonical title match (the folder name). preferredType null = no type restriction.
             var byFolder = await backend.ResolveByNameAsync(
-                new[] { "a place further than the universe" }, null, null, CancellationToken.None);
+                new[] { "a place further than the universe" }, null, null, null, CancellationToken.None);
             Assert.NotNull(byFolder);
             Assert.Equal("A Place Further Than the Universe", byFolder!.CanonicalTitle);
 
             // Original (Japanese) title also matches.
             var byOriginal = await backend.ResolveByNameAsync(
-                new[] { "宇宙よりも遠い場所" }, null, null, CancellationToken.None);
+                new[] { "宇宙よりも遠い場所" }, null, null, null, CancellationToken.None);
             Assert.NotNull(byOriginal);
 
             // Ambiguous title without a year → no guess.
             Assert.Null(await backend.ResolveByNameAsync(
-                new[] { "Hunter x Hunter" }, null, null, CancellationToken.None));
+                new[] { "Hunter x Hunter" }, null, null, null, CancellationToken.None));
 
             // Year disambiguates.
             var hxh = await backend.ResolveByNameAsync(
-                new[] { "Hunter x Hunter" }, 2011, null, CancellationToken.None);
+                new[] { "Hunter x Hunter" }, 2011, null, null, CancellationToken.None);
             Assert.NotNull(hxh);
             Assert.Equal(2011, hxh!.ReleaseYear);
 
             // Unknown name → null.
             Assert.Null(await backend.ResolveByNameAsync(
-                new[] { "Does Not Exist" }, null, null, CancellationToken.None));
+                new[] { "Does Not Exist" }, null, null, null, CancellationToken.None));
         }
         finally
         {
