@@ -26,6 +26,9 @@
         #metaHubPage .mhTypeSel { flex: 0 0 auto; margin-right: .4em; color: inherit; background: rgba(128,128,128,.18); border: 1px solid rgba(128,128,128,.3); border-radius: 6px; padding: .3em .5em; }
         #metaHubPage .mhSteps li { margin-bottom: .6em; }
         #metaHubPage .mhStatus { margin-top: .6em; }
+        #metaHubPage .mhTabs { display: flex; flex-wrap: wrap; gap: .4em; }
+        #metaHubPage .mhTab { background: rgba(128,128,128,.14); border: 0; border-radius: 999px; padding: .45em 1.1em; color: inherit; cursor: pointer; opacity: .7; font: inherit; }
+        #metaHubPage .mhTab.ui-btn-active { background: rgba(0,164,220,.3); opacity: 1; }
         #metaHubPage .hide { display: none !important; }
     </style>
 </head>
@@ -40,12 +43,13 @@
                 running fully inside Jellyfin (no server, no Docker).
             </p>
 
-            <!-- Native Jellyfin tab bar -->
-            <div class="localnav" style="margin-bottom:1.5em;">
-                <a is="emby-linkbutton" class="ui-btn mhTab ui-btn-active" data-tab="general">General</a>
-                <a is="emby-linkbutton" class="ui-btn mhTab" data-tab="libraries">Libraries</a>
-                <a is="emby-linkbutton" class="ui-btn mhTab" data-tab="sources">Metadata sources</a>
-                <a is="emby-linkbutton" class="ui-btn mhTab" data-tab="help">Help</a>
+            <!-- In-page tab bar. Plain buttons, NOT <a is="emby-linkbutton">: that component
+                 routes on click (ignoring preventDefault) and would navigate away from the page. -->
+            <div class="mhTabs" style="margin-bottom:1.5em;">
+                <button type="button" class="mhTab ui-btn-active" data-tab="general">General</button>
+                <button type="button" class="mhTab" data-tab="libraries">Libraries</button>
+                <button type="button" class="mhTab" data-tab="sources">Metadata sources</button>
+                <button type="button" class="mhTab" data-tab="help">Help</button>
             </div>
 
             <!-- ============ General ============ -->
