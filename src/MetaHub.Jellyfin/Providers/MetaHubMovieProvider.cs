@@ -11,12 +11,16 @@ public class MetaHubMovieProvider : IRemoteMetadataProvider<Movie, MovieInfo>
     private readonly IMetaHubBackend _backend;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly MetaHubItemGate _gate;
+    private readonly MetaHubLibraryClassifier _classifier;
 
-    public MetaHubMovieProvider(IMetaHubBackend backend, IHttpClientFactory httpClientFactory, MetaHubItemGate gate)
+    public MetaHubMovieProvider(
+        IMetaHubBackend backend, IHttpClientFactory httpClientFactory,
+        MetaHubItemGate gate, MetaHubLibraryClassifier classifier)
     {
         _backend = backend;
         _httpClientFactory = httpClientFactory;
         _gate = gate;
+        _classifier = classifier;
     }
 
     public string Name => "MetaHub";
@@ -28,9 +32,10 @@ public class MetaHubMovieProvider : IRemoteMetadataProvider<Movie, MovieInfo>
         var work = await _backend.ResolveAsync(info.ProviderIds, config.PreferredLanguage, cancellationToken)
             .ConfigureAwait(false);
 
-        // No provider id matched — fall back to title matching (lookup name, then file/folder name).
+        // No provider id matched — fall back to title matching, biased by the library's media type.
+        var preferredType = _classifier.Classify(info, config);
         work ??= await _backend.ResolveByNameAsync(
-                MetaHubMapping.NameCandidates(info), info.Year, config.PreferredLanguage, cancellationToken)
+                MetaHubMapping.NameCandidates(info), info.Year, preferredType, config.PreferredLanguage, cancellationToken)
             .ConfigureAwait(false);
 
         if (work is null)

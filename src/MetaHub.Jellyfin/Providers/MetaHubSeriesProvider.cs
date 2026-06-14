@@ -11,12 +11,16 @@ public class MetaHubSeriesProvider : IRemoteMetadataProvider<Series, SeriesInfo>
     private readonly IMetaHubBackend _backend;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly MetaHubItemGate _gate;
+    private readonly MetaHubLibraryClassifier _classifier;
 
-    public MetaHubSeriesProvider(IMetaHubBackend backend, IHttpClientFactory httpClientFactory, MetaHubItemGate gate)
+    public MetaHubSeriesProvider(
+        IMetaHubBackend backend, IHttpClientFactory httpClientFactory,
+        MetaHubItemGate gate, MetaHubLibraryClassifier classifier)
     {
         _backend = backend;
         _httpClientFactory = httpClientFactory;
         _gate = gate;
+        _classifier = classifier;
     }
 
     public string Name => "MetaHub";
@@ -28,9 +32,11 @@ public class MetaHubSeriesProvider : IRemoteMetadataProvider<Series, SeriesInfo>
         var work = await _backend.ResolveAsync(info.ProviderIds, config.PreferredLanguage, cancellationToken)
             .ConfigureAwait(false);
 
-        // No provider id matched — fall back to title matching (lookup name, then folder name).
+        // No provider id matched — fall back to title matching (lookup name, then folder name),
+        // biased by the library's media type so e.g. "227" finds the anime "22/7" in an Anime library.
+        var preferredType = _classifier.Classify(info, config);
         work ??= await _backend.ResolveByNameAsync(
-                MetaHubMapping.NameCandidates(info), info.Year, config.PreferredLanguage, cancellationToken)
+                MetaHubMapping.NameCandidates(info), info.Year, preferredType, config.PreferredLanguage, cancellationToken)
             .ConfigureAwait(false);
 
         if (work is null)

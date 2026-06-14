@@ -95,7 +95,7 @@ public class MetaHubBackend : IMetaHubBackend
     }
 
     public async Task<WorkDto?> ResolveByNameAsync(
-        IEnumerable<string> nameCandidates, int? year, string? lang, CancellationToken ct)
+        IEnumerable<string> nameCandidates, int? year, MediaType? preferredType, string? lang, CancellationToken ct)
     {
         var names = nameCandidates
             .Where(n => !string.IsNullOrWhiteSpace(n))
@@ -117,21 +117,47 @@ public class MetaHubBackend : IMetaHubBackend
         foreach (var name in names)
         {
             var lowered = name.ToLowerInvariant();
-            var matches = await db.Works
-                .Where(w => w.CanonicalTitle.ToLower() == lowered
-                            || (w.OriginalTitle != null && w.OriginalTitle.ToLower() == lowered))
-                .Select(w => new { w.Id, w.ReleaseYear })
-                .Take(5)
+            var norm = NormTitle(name);
+
+            // Restrict to the library's media type when known (e.g. only Anime in an "Anime" library).
+            var query = db.Works.AsQueryable();
+            if (preferredType is { } pt)
+                query = query.Where(w => w.MediaType == pt);
+
+            // Exact (case-insensitive) OR punctuation-insensitive match so a folder "227" finds
+            // the anime "22/7". The Replace chain is translated to SQLite replace() by EF Core.
+            var matches = await query
+                .Where(w =>
+                    w.CanonicalTitle.ToLower() == lowered
+                    || (w.OriginalTitle != null && w.OriginalTitle.ToLower() == lowered)
+                    || w.CanonicalTitle.ToLower()
+                        .Replace(" ", "").Replace("/", "").Replace("-", "").Replace(":", "")
+                        .Replace(".", "").Replace(",", "").Replace("'", "").Replace("!", "")
+                        .Replace("?", "").Replace("_", "") == norm
+                    || (w.OriginalTitle != null && w.OriginalTitle.ToLower()
+                        .Replace(" ", "").Replace("/", "").Replace("-", "").Replace(":", "")
+                        .Replace(".", "").Replace(",", "").Replace("'", "").Replace("!", "")
+                        .Replace("?", "").Replace("_", "") == norm))
+                .Select(w => new { w.Id, w.ReleaseYear, w.CanonicalTitle, w.OriginalTitle })
+                .Take(8)
                 .ToListAsync(ct).ConfigureAwait(false);
 
             if (matches.Count == 0)
                 continue;
 
-            // Disambiguate by year when several works share the title (remakes etc.).
-            var pick = matches.Count == 1
-                ? matches[0]
+            // Prefer an exact title hit over a punctuation-only (fuzzy) hit.
+            var exact = matches
+                .Where(m => string.Equals(m.CanonicalTitle, name, StringComparison.OrdinalIgnoreCase)
+                            || (m.OriginalTitle != null
+                                && string.Equals(m.OriginalTitle, name, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            var pool = exact.Count > 0 ? exact : matches;
+
+            // Disambiguate by year when several works remain (remakes etc.).
+            var pick = pool.Count == 1
+                ? pool[0]
                 : year is { } y
-                    ? matches.FirstOrDefault(m => m.ReleaseYear == y)
+                    ? pool.FirstOrDefault(m => m.ReleaseYear == y)
                     : null;
             if (pick is null)
                 continue;
@@ -142,6 +168,18 @@ public class MetaHubBackend : IMetaHubBackend
         }
 
         return null;
+    }
+
+    /// <summary>Lowercase a title and strip common separators so "22/7" and "227" compare equal.
+    /// Must mirror the SQL Replace chain in <see cref="ResolveByNameAsync"/>.</summary>
+    private static string NormTitle(string? title)
+    {
+        if (string.IsNullOrEmpty(title))
+            return string.Empty;
+        var s = title.ToLowerInvariant();
+        foreach (var sep in new[] { " ", "/", "-", ":", ".", ",", "'", "!", "?", "_" })
+            s = s.Replace(sep, string.Empty);
+        return s;
     }
 
     public async Task<EpisodeDto?> GetEpisodeAsync(

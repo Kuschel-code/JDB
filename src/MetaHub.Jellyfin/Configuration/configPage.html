@@ -23,6 +23,7 @@
         #metaHubPage .mhSwitch input:checked + .mhSlider:before { transform: translateX(22px); }
         #metaHubPage .mhSwitch input:disabled + .mhSlider { opacity: .4; cursor: not-allowed; }
         #metaHubPage .mhMore { width: 100%; padding: .6em; background: rgba(128,128,128,.18); border: 0; border-radius: 8px; color: inherit; cursor: pointer; }
+        #metaHubPage .mhTypeSel { flex: 0 0 auto; margin-right: .4em; color: inherit; background: rgba(128,128,128,.18); border: 1px solid rgba(128,128,128,.3); border-radius: 6px; padding: .3em .5em; }
         #metaHubPage .mhSteps li { margin-bottom: .6em; }
         #metaHubPage .mhStatus { margin-top: .6em; }
         #metaHubPage .hide { display: none !important; }
@@ -242,7 +243,7 @@
     <script type="text/javascript">
         (function () {
             var pluginId = 'a3f1c2d4-5b6e-47a8-9c0d-1e2f3a4b5c6d';
-            var page, config, disabled, saveTimer;
+            var page, config, disabled, overrides, saveTimer;
 
             var checks = ['UseEmbeddedEngine','EnableMovies','EnableSeries','EnableAnime','EnableMusic','EnableBooks','EnrichOnDemand','AniDbEnabled'];
             var texts = ['ApiBaseUrl','ApiKey','RequestTimeoutSeconds','PreferredLanguage','FallbackLanguage','WriteMode','TmdbApiKey','GoogleBooksApiKey','AnnictToken','AniDbClientName','AniDbClientVersion','AniDbUsername','AniDbPassword'];
@@ -255,10 +256,29 @@
                 if (!off && i !== -1) disabled.splice(i, 1);
                 queueSave();
             }
+
+            // Per-library media-type overrides: { normalizedLibraryId: "Anime"|"Series"|... }.
+            function parseOverrides(arr) {
+                var m = {};
+                (arr || []).forEach(function (e) {
+                    var i = (e || '').indexOf('=');
+                    if (i > 0) { var k = norm(e.slice(0, i)); var v = e.slice(i + 1).trim(); if (k && v) m[k] = v; }
+                });
+                return m;
+            }
+            function serializeOverrides() {
+                return Object.keys(overrides).map(function (k) { return k + '=' + overrides[k]; });
+            }
+            function setOverride(id, type) {
+                var n = norm(id);
+                if (type) overrides[n] = type; else delete overrides[n];
+                queueSave();
+            }
             function queueSave() {
                 clearTimeout(saveTimer);
                 saveTimer = setTimeout(function () {
                     config.DisabledItemIds = disabled.slice();
+                    config.LibraryTypeOverrides = serializeOverrides();
                     ApiClient.updatePluginConfiguration(pluginId, config);
                 }, 300);
             }
@@ -278,12 +298,20 @@
 
                 var chevron = opts.expandable ? '<div class="mhChevron" data-act="expand">&#9656;</div>' : '';
                 var hasThumb = opts.thumb !== false;
+                // Library rows get a media-type override select (options are constant, safe as HTML).
+                var typeSel = opts.typeSelect
+                    ? '<select class="mhTypeSel" title="What MetaHub treats this library as">'
+                      + '<option value="">Auto</option><option value="Anime">Anime</option>'
+                      + '<option value="Series">Series</option><option value="Movie">Movie</option>'
+                      + '<option value="Music">Music</option><option value="Book">Book</option></select>'
+                    : '';
                 // hint is always a constant we control; item.Name is untrusted (library/series/movie
                 // titles can contain arbitrary characters) so it is set via textContent below, never HTML.
                 el.innerHTML =
                     (hasThumb ? '<div class="mhThumb"></div>' : '') +
                     '<div class="mhMeta"><div class="mhName"></div>' +
                     (opts.hint ? '<div class="mhHint">' + opts.hint + '</div>' : '') + '</div>' +
+                    typeSel +
                     chevron +
                     '<label class="mhSwitch"><input type="checkbox"' + (off ? '' : ' checked') + (parentOff ? ' disabled' : '') + ' /><span class="mhSlider"></span></label>';
 
@@ -291,6 +319,11 @@
                 if (hasThumb) {
                     var url = ApiClient.getImageUrl(item.Id, { type: 'Primary', maxHeight: 80 });
                     el.querySelector('.mhThumb').style.backgroundImage = 'url(' + JSON.stringify(url) + ')';
+                }
+                if (opts.typeSelect) {
+                    var sel = el.querySelector('.mhTypeSel');
+                    sel.value = overrides[norm(item.Id)] || '';
+                    sel.addEventListener('change', function () { setOverride(item.Id, sel.value); });
                 }
 
                 var input = el.querySelector('input');
@@ -359,8 +392,9 @@
                         var libItem = { Id: lib.ItemId, Name: lib.Name };
                         var r = row(libItem, {
                             thumb: false,
-                            hint: 'Expand to manage individual items',
+                            hint: 'Type + on/off for the whole library; expand to manage items',
                             expandable: true,
+                            typeSelect: true,
                             loadChildren: function (box, off) { loadLibraryPage(lib, box, 0, off || isDisabled(lib.ItemId)); }
                         });
                         tree.appendChild(r.el);
@@ -414,6 +448,7 @@
                 config.RequestTimeoutSeconds = parseInt(config.RequestTimeoutSeconds, 10) || 30;
                 config.AniDbClientVersion = parseInt(config.AniDbClientVersion, 10) || 1;
                 config.DisabledItemIds = disabled.slice();
+                config.LibraryTypeOverrides = serializeOverrides();
                 ApiClient.updatePluginConfiguration(pluginId, config).then(Dashboard.processPluginConfigurationUpdateResult);
             }
 
@@ -430,6 +465,7 @@
                 ApiClient.getPluginConfiguration(pluginId).then(function (c) {
                     config = c;
                     disabled = (c.DisabledItemIds || []).map(norm);
+                    overrides = parseOverrides(c.LibraryTypeOverrides);
                     loadForm();
                     renderTree();
                     showTab('general');

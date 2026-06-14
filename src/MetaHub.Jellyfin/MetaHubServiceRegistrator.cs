@@ -64,6 +64,9 @@ public class MetaHubServiceRegistrator : IPluginServiceRegistrator
         // Per-item enable/disable gate (resolves library ancestry; ILibraryManager is host-provided).
         services.AddSingleton<MetaHubItemGate>();
 
+        // Library-name -> media-type classifier (uses ILibraryManager, host-provided).
+        services.AddSingleton<MetaHubLibraryClassifier>();
+
         // The backend the providers talk to (embedded or remote, decided per call).
         services.AddSingleton<Func<Configuration.PluginConfiguration>>(_ => () => Plugin.Instance!.Configuration);
         services.AddSingleton<IMetaHubBackend, MetaHubBackend>();
