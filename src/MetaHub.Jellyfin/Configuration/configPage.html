@@ -455,7 +455,7 @@
             document.querySelector('#metaHubPage').addEventListener('pageshow', function () {
                 page = this;
                 Dashboard.showLoadingMsg();
-                page.querySelectorAll('.mhTab').forEach(function (t) { t.addEventListener('click', function () { showTab(t.getAttribute('data-tab')); }); });
+                page.querySelectorAll('.mhTab').forEach(function (t) { t.addEventListener('click', function (e) { e.preventDefault(); showTab(t.getAttribute('data-tab')); }); });
                 page.querySelector('#mhFilter').addEventListener('input', function () { onFilter(this.value.trim()); });
                 page.querySelector('#UseEmbeddedEngine').addEventListener('change', toggleRemote);
                 page.querySelector('#AniDbEnabled').addEventListener('change', toggleAniDb);
