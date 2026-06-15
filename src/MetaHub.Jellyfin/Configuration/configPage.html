@@ -4,31 +4,51 @@
     <meta charset="utf-8" />
     <title>MetaHub</title>
     <style>
-        /* Theme-friendly: only translucent shades derived from the current theme, no hard-coded
-           dark colors, so the page works on light and dark Jellyfin themes alike. */
-        #metaHubPage .mhCard { background: rgba(128,128,128,.12); border: 1px solid rgba(128,128,128,.18); border-radius: 10px; padding: 1.2em 1.4em; margin-bottom: 1.2em; }
-        #metaHubPage .mhCard h3 { margin-top: 0; }
-        #metaHubPage .mhRow { display: flex; align-items: center; gap: 1em; padding: .7em 1em; margin-bottom: .6em; background: rgba(128,128,128,.12); border: 1px solid rgba(128,128,128,.18); border-radius: 10px; }
-        #metaHubPage .mhRow.mhChild { margin-left: 2.5em; }
-        #metaHubPage .mhThumb { width: 42px; height: 60px; flex: 0 0 auto; border-radius: 4px; background: rgba(128,128,128,.3) center/cover no-repeat; }
+        /* Native Jellyfin-dashboard look: neutral translucent shades + the Jellyfin accent, so it
+           sits inside the dashboard on any (light/dark) theme rather than looking like a bolt-on. */
+        #metaHubPage { --mh-accent: #00a4dc; --mh-line: rgba(128,128,128,.22); --mh-surface: rgba(128,128,128,.06); --mh-hover: rgba(128,128,128,.1); }
+
+        #metaHubPage .mhIntro { max-width: 60em; margin: .25em 0 1.5em; opacity: .72; line-height: 1.5; }
+
+        /* Tabs — underline style like Jellyfin's localnav, not rounded pills. */
+        #metaHubPage .mhTabs { display: flex; flex-wrap: wrap; gap: .15em; border-bottom: 1px solid var(--mh-line); margin-bottom: 1.8em; }
+        #metaHubPage .mhTab { background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: .7em 1.05em; color: inherit; opacity: .6; cursor: pointer; font: inherit; font-weight: 600; }
+        #metaHubPage .mhTab:hover { opacity: .9; }
+        #metaHubPage .mhTab.ui-btn-active { opacity: 1; color: var(--mh-accent); border-bottom-color: var(--mh-accent); }
+
+        /* Sections */
+        #metaHubPage .mhCard { background: var(--mh-surface); border: 1px solid var(--mh-line); border-radius: 8px; padding: 1.35em 1.5em; margin-bottom: 1.3em; }
+        #metaHubPage .mhCard h3 { margin: 0 0 1.1em; font-size: .8em; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; opacity: .65; }
+        #metaHubPage .mhCard .fieldDescription { line-height: 1.5; }
+        #metaHubPage .mhChecks { display: flex; flex-wrap: wrap; column-gap: 2.5em; }
+        #metaHubPage .mhChecks .checkboxContainer { flex: 1 1 9em; }
+
+        /* Library list — one continuous divided list with hover, not separate boxed cards. */
+        #metaHubPage .mhRow { display: flex; align-items: center; gap: 1em; padding: .6em .55em; border-bottom: 1px solid rgba(128,128,128,.12); }
+        #metaHubPage .mhRow:hover { background: var(--mh-hover); }
+        #metaHubPage .mhRow.mhChild { margin-left: 1.6em; }
+        #metaHubPage .mhThumb { width: 40px; height: 58px; flex: 0 0 auto; border-radius: 4px; background: rgba(128,128,128,.25) center/cover no-repeat; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
         #metaHubPage .mhMeta { flex: 1 1 auto; min-width: 0; }
         #metaHubPage .mhName { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        #metaHubPage .mhHint { opacity: .6; font-size: .85em; }
-        #metaHubPage .mhChevron { cursor: pointer; padding: .2em .6em; opacity: .7; user-select: none; }
-        #metaHubPage .mhSwitch { position: relative; width: 46px; height: 24px; flex: 0 0 auto; }
+        #metaHubPage .mhHint { opacity: .55; font-size: .82em; margin-top: .1em; }
+        #metaHubPage .mhChevron { cursor: pointer; padding: .2em .55em; opacity: .55; user-select: none; }
+        #metaHubPage .mhChevron:hover { opacity: 1; }
+
+        /* Switch */
+        #metaHubPage .mhSwitch { position: relative; width: 42px; height: 22px; flex: 0 0 auto; }
         #metaHubPage .mhSwitch input { opacity: 0; width: 0; height: 0; }
-        #metaHubPage .mhSlider { position: absolute; inset: 0; background: rgba(128,128,128,.45); border-radius: 999px; transition: .2s; cursor: pointer; }
-        #metaHubPage .mhSlider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
-        #metaHubPage .mhSwitch input:checked + .mhSlider { background: #00a4dc; }
-        #metaHubPage .mhSwitch input:checked + .mhSlider:before { transform: translateX(22px); }
+        #metaHubPage .mhSlider { position: absolute; inset: 0; background: rgba(128,128,128,.4); border-radius: 999px; transition: .2s; cursor: pointer; }
+        #metaHubPage .mhSlider:before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+        #metaHubPage .mhSwitch input:checked + .mhSlider { background: var(--mh-accent); }
+        #metaHubPage .mhSwitch input:checked + .mhSlider:before { transform: translateX(20px); }
         #metaHubPage .mhSwitch input:disabled + .mhSlider { opacity: .4; cursor: not-allowed; }
-        #metaHubPage .mhMore { width: 100%; padding: .6em; background: rgba(128,128,128,.18); border: 0; border-radius: 8px; color: inherit; cursor: pointer; }
-        #metaHubPage .mhTypeSel { flex: 0 0 auto; margin-right: .4em; color: inherit; background: rgba(128,128,128,.18); border: 1px solid rgba(128,128,128,.3); border-radius: 6px; padding: .3em .5em; }
-        #metaHubPage .mhSteps li { margin-bottom: .6em; }
+
+        #metaHubPage .mhTypeSel { flex: 0 0 auto; margin-right: .5em; color: inherit; background: rgba(128,128,128,.14); border: 1px solid var(--mh-line); border-radius: 6px; padding: .35em .5em; font: inherit; }
+        #metaHubPage .mhMore { width: 100%; padding: .7em; margin-top: .5em; background: transparent; border: 1px dashed var(--mh-line); border-radius: 8px; color: inherit; cursor: pointer; opacity: .8; }
+        #metaHubPage .mhMore:hover { background: var(--mh-hover); opacity: 1; }
+        #metaHubPage .mhSteps { line-height: 1.55; }
+        #metaHubPage .mhSteps li { margin-bottom: .5em; }
         #metaHubPage .mhStatus { margin-top: .6em; }
-        #metaHubPage .mhTabs { display: flex; flex-wrap: wrap; gap: .4em; }
-        #metaHubPage .mhTab { background: rgba(128,128,128,.14); border: 0; border-radius: 999px; padding: .45em 1.1em; color: inherit; cursor: pointer; opacity: .7; font: inherit; }
-        #metaHubPage .mhTab.ui-btn-active { background: rgba(0,164,220,.3); opacity: 1; }
         #metaHubPage .hide { display: none !important; }
     </style>
 </head>
@@ -38,7 +58,7 @@
         <div class="content-primary">
 
             <h2 style="margin-bottom:.2em;">MetaHub</h2>
-            <p class="fieldDescription" style="max-width:60em;margin-bottom:1.2em;">
+            <p class="fieldDescription mhIntro">
                 Aggregated metadata and artwork for movies, series, anime, music and books —
                 running fully inside Jellyfin (no server, no Docker).
             </p>
@@ -89,11 +109,13 @@
                         <div class="fieldDescription" style="margin-bottom:.8em;">
                             MetaHub only provides metadata and artwork for the selected types.
                         </div>
-                        <label class="checkboxContainer"><input id="EnableMovies" type="checkbox" is="emby-checkbox" /><span>Movies</span></label>
-                        <label class="checkboxContainer"><input id="EnableSeries" type="checkbox" is="emby-checkbox" /><span>Series</span></label>
-                        <label class="checkboxContainer"><input id="EnableAnime" type="checkbox" is="emby-checkbox" /><span>Anime</span></label>
-                        <label class="checkboxContainer"><input id="EnableMusic" type="checkbox" is="emby-checkbox" /><span>Music</span></label>
-                        <label class="checkboxContainer"><input id="EnableBooks" type="checkbox" is="emby-checkbox" /><span>Books</span></label>
+                        <div class="mhChecks">
+                            <label class="checkboxContainer"><input id="EnableMovies" type="checkbox" is="emby-checkbox" /><span>Movies</span></label>
+                            <label class="checkboxContainer"><input id="EnableSeries" type="checkbox" is="emby-checkbox" /><span>Series</span></label>
+                            <label class="checkboxContainer"><input id="EnableAnime" type="checkbox" is="emby-checkbox" /><span>Anime</span></label>
+                            <label class="checkboxContainer"><input id="EnableMusic" type="checkbox" is="emby-checkbox" /><span>Music</span></label>
+                            <label class="checkboxContainer"><input id="EnableBooks" type="checkbox" is="emby-checkbox" /><span>Books</span></label>
+                        </div>
                     </div>
 
                     <div class="mhCard">
