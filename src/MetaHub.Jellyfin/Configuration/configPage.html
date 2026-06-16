@@ -1,8 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <title>MetaHub</title>
+<!-- Jellyfin loads a plugin config page as an HTML *fragment*: it lifts the element with
+     data-role="page" into the dashboard SPA and drops everything outside it. A <style> in a
+     <head> therefore never reaches the DOM (the styling silently disappears). So this page is a
+     bare fragment and the <style> lives INSIDE the page element, exactly like other plugins. -->
+<div id="metaHubPage" data-role="page" class="page type-interior pluginConfigurationPage">
     <style>
         /* Native Jellyfin-dashboard look: neutral translucent shades + the Jellyfin accent, so it
            sits inside the dashboard on any (light/dark) theme rather than looking like a bolt-on. */
@@ -43,7 +43,12 @@
         #metaHubPage .mhSwitch input:checked + .mhSlider:before { transform: translateX(20px); }
         #metaHubPage .mhSwitch input:disabled + .mhSlider { opacity: .4; cursor: not-allowed; }
 
-        #metaHubPage .mhTypeSel { flex: 0 0 auto; margin-right: .5em; color: inherit; background: rgba(128,128,128,.14); border: 1px solid var(--mh-line); border-radius: 6px; padding: .35em .5em; font: inherit; }
+        /* Solid, high-contrast colours on the select *and* its options: a native <select> renders
+           its popped-open option list with the element's own colours, so an inherited light colour
+           over a translucent background gave dark-on-dark, barely-readable options. color-scheme
+           keeps the browser's native dropdown chrome dark too. */
+        #metaHubPage .mhTypeSel { flex: 0 0 auto; margin-right: .5em; color: #fff; background-color: #2b2b2b; color-scheme: dark; border: 1px solid var(--mh-line); border-radius: 6px; padding: .35em .5em; font: inherit; }
+        #metaHubPage .mhTypeSel option { color: #fff; background-color: #2b2b2b; }
         #metaHubPage .mhMore { width: 100%; padding: .7em; margin-top: .5em; background: transparent; border: 1px dashed var(--mh-line); border-radius: 8px; color: inherit; cursor: pointer; opacity: .8; }
         #metaHubPage .mhMore:hover { background: var(--mh-hover); opacity: 1; }
         #metaHubPage .mhSteps { line-height: 1.55; }
@@ -51,9 +56,7 @@
         #metaHubPage .mhStatus { margin-top: .6em; }
         #metaHubPage .hide { display: none !important; }
     </style>
-</head>
-<body>
-<div id="metaHubPage" data-role="page" class="page type-interior pluginConfigurationPage">
+
     <div data-role="content">
         <div class="content-primary">
 
@@ -501,5 +504,3 @@
         })();
     </script>
 </div>
-</body>
-</html>
