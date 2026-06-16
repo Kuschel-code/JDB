@@ -1,7 +1,7 @@
 ---
 name: "MetaHub"
 guid: "a3f1c2d4-5b6e-47a8-9c0d-1e2f3a4b5c6d"
-version: "0.1.7.3"
+version: "0.1.7.8"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 owner: "kuschel-code"
@@ -14,6 +14,7 @@ category: "Metadata"
 artifacts:
   - "MetaHub.Jellyfin.dll"
 changelog: >
-  0.1.7.3 - Posters/thumbnails from the mapping dataset are stored during ingest, so every
-  anime has artwork immediately (no enrichment needed); existing libraries get art on the
-  next "Update anime mappings" run. New project logo in the plugin catalog.
+  0.1.7.8 - Fixes the settings page rendering: Jellyfin loads a config page as an HTML
+  fragment and dropped the <style> in <head>, so the custom design (slider toggles, tabs,
+  cards) silently fell back to raw checkboxes. The page is now a bare fragment with the
+  styles inside it. Also makes the per-library type dropdown readable (white-on-dark options).
