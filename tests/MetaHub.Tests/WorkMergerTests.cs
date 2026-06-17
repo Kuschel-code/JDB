@@ -66,6 +66,38 @@ public class WorkMergerTests
     }
 
     [Fact]
+    public async Task TitleTranslations_are_added_even_when_the_canonical_title_is_kept()
+    {
+        // Reproduces the "romaji title shown" bug: manami seeds the romaji CanonicalTitle, then
+        // enrichment runs in the default FillMissingOnly mode. The romaji title is (correctly)
+        // kept, but the English title must still be captured as a translation so it can be shown.
+        await using var db = NewDb();
+        var work = new Work
+        {
+            MediaType = MediaType.Anime,
+            CanonicalTitle = "Youkoso Jitsuryoku Shijou Shugi no Kyoushitsu e" // manami romaji seed
+        };
+        db.Works.Add(work);
+        await db.SaveChangesAsync();
+
+        var aniList = new NormalizedWorkData
+        {
+            Source = ExternalIdSource.AniList,
+            CanonicalTitle = "Classroom of the Elite"
+        };
+        aniList.TitleTranslations["en"] = "Classroom of the Elite";
+        aniList.TitleTranslations["ja"] = "ようこそ実力至上主義の教室へ";
+
+        await new WorkMerger(db).ApplyAsync(work, new[] { aniList }, EnrichmentWriteMode.FillMissingOnly);
+        await db.SaveChangesAsync();
+
+        var saved = await db.Works.AsNoTracking().SingleAsync(w => w.Id == work.Id);
+        Assert.Equal("Youkoso Jitsuryoku Shijou Shugi no Kyoushitsu e", saved.CanonicalTitle); // kept
+        Assert.Equal("Classroom of the Elite", saved.TitleTranslations["en"]);                 // captured
+        Assert.Equal("ようこそ実力至上主義の教室へ", saved.TitleTranslations["ja"]);
+    }
+
+    [Fact]
     public async Task FillMissingOnly_preserves_existing_scalars_but_adds_new_data()
     {
         await using var db = NewDb();

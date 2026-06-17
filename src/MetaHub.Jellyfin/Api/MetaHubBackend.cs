@@ -272,6 +272,25 @@ public class MetaHubBackend : IMetaHubBackend
             .AsNoTracking()
             .FirstOrDefaultAsync(w => w.Id == id, ct);
 
+    /// <summary>
+    /// Chooses the title to display: the viewer's preferred language, then English, then the
+    /// canonical title. This keeps an anime from showing its romaji <c>CanonicalTitle</c> (manami's
+    /// primary title) when an English/localized title exists — mirroring overview localization.
+    /// </summary>
+    public static string PickTitle(
+        string canonicalTitle, IReadOnlyDictionary<string, string> titleTranslations, string? preferredLanguage)
+    {
+        if (!string.IsNullOrWhiteSpace(preferredLanguage)
+            && titleTranslations.TryGetValue(preferredLanguage, out var preferred)
+            && !string.IsNullOrWhiteSpace(preferred))
+            return preferred;
+
+        if (titleTranslations.TryGetValue("en", out var english) && !string.IsNullOrWhiteSpace(english))
+            return english;
+
+        return canonicalTitle;
+    }
+
     private static WorkDto ToDto(Work work, string? lang)
     {
         var overview = work.Overview;
@@ -284,7 +303,7 @@ public class MetaHubBackend : IMetaHubBackend
         {
             Id = work.Id,
             MediaType = work.MediaType.ToString(),
-            CanonicalTitle = work.CanonicalTitle,
+            CanonicalTitle = PickTitle(work.CanonicalTitle, work.TitleTranslations, lang),
             OriginalTitle = work.OriginalTitle,
             ReleaseYear = work.ReleaseYear,
             Overview = overview,

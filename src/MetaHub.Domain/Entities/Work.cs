@@ -25,6 +25,13 @@ public class Work
     /// <summary>Locale-keyed overview translations, e.g. {"de": "...", "ja": "..."}. Stored as JSONB.</summary>
     public Dictionary<string, string> OverviewTranslations { get; set; } = new();
 
+    /// <summary>
+    /// Locale-keyed title translations, e.g. {"en": "Classroom of the Elite", "ja": "…"}. Stored
+    /// as JSONB. Lets MetaHub show a name in the viewer's language instead of an anime's romaji
+    /// <see cref="CanonicalTitle"/>. Mirrors <see cref="OverviewTranslations"/>.
+    /// </summary>
+    public Dictionary<string, string> TitleTranslations { get; set; } = new();
+
     public WorkStatus Status { get; set; } = WorkStatus.Unknown;
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
