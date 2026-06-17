@@ -54,6 +54,9 @@ public class SqliteSchemaTests
         }
         finally
         {
+            // SQLite pools connections by default, keeping the file handle open on Windows;
+            // release it before deleting the temp database.
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             if (File.Exists(dbPath)) File.Delete(dbPath);
         }
     }

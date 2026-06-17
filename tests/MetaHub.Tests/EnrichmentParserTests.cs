@@ -42,6 +42,31 @@ public class EnrichmentParserTests
     }
 
     [Fact]
+    public void AniList_captures_localized_titles_so_the_english_name_can_be_preferred()
+    {
+        // A Japanese anime whose romaji title differs from its English title — the case where
+        // showing the romaji "CanonicalTitle" hides the name users actually search for.
+        const string json = """
+        {
+          "data": {
+            "Media": {
+              "title": {
+                "romaji": "Youkoso Jitsuryoku Shijou Shugi no Kyoushitsu e",
+                "english": "Classroom of the Elite",
+                "native": "ようこそ実力至上主義の教室へ"
+              }
+            }
+          }
+        }
+        """;
+
+        var data = new AniListProvider(factory: null!).Parse(json);
+
+        Assert.Equal("Classroom of the Elite", data.TitleTranslations["en"]);
+        Assert.Equal("ようこそ実力至上主義の教室へ", data.TitleTranslations["ja"]);
+    }
+
+    [Fact]
     public void Jikan_parses_data_fields()
     {
         const string json = """

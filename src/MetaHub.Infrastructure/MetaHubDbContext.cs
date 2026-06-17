@@ -68,6 +68,10 @@ public class MetaHubDbContext : DbContext
             ot.HasConversion(dictConverter);
             ot.Metadata.SetValueComparer(dictComparer);
             if (useJsonb) ot.HasColumnType("jsonb");
+            var tt = e.Property(x => x.TitleTranslations);
+            tt.HasConversion(dictConverter);
+            tt.Metadata.SetValueComparer(dictComparer);
+            if (useJsonb) tt.HasColumnType("jsonb");
             e.HasIndex(x => x.MediaType);
             e.HasIndex(x => x.CanonicalTitle);
         });

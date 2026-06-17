@@ -53,6 +53,13 @@ public class WorkMerger
                 if (writeMode == EnrichmentWriteMode.Overwrite || !work.OverviewTranslations.ContainsKey(lang))
                     work.OverviewTranslations[lang] = text;
 
+        // Title translations: same union. Added even in fill-only mode (the canonical title may be a
+        // manami romaji seed), so the serve layer can show a localized name without overwriting it.
+        foreach (var data in ordered.Reverse())
+            foreach (var (lang, text) in data.TitleTranslations)
+                if (writeMode == EnrichmentWriteMode.Overwrite || !work.TitleTranslations.ContainsKey(lang))
+                    work.TitleTranslations[lang] = text;
+
         work.UpdatedAt = DateTimeOffset.UtcNow;
 
         await ApplyDetailAsync(work, ordered, writeMode, ct);

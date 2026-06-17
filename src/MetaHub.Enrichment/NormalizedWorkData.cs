@@ -20,6 +20,8 @@ public class NormalizedWorkData
     public int? ReleaseYear { get; set; }
     public string? Overview { get; set; }
     public Dictionary<string, string> OverviewTranslations { get; } = new();
+    /// <summary>Locale-keyed title translations, e.g. {"en": "Classroom of the Elite", "ja": "…"}.</summary>
+    public Dictionary<string, string> TitleTranslations { get; } = new();
     public WorkStatus? Status { get; set; }
     public List<string> Genres { get; } = new();
     public List<NormalizedImage> Images { get; } = new();

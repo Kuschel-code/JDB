@@ -78,8 +78,13 @@ query ($id: Int) {
         {
             var english = GetString(title, "english");
             var romaji = GetString(title, "romaji");
+            var native = GetString(title, "native");
             data.CanonicalTitle = english ?? romaji;
-            data.OriginalTitle = GetString(title, "native") ?? romaji;
+            data.OriginalTitle = native ?? romaji;
+
+            // Localized titles so the serve layer can show the viewer's language instead of romaji.
+            if (!string.IsNullOrWhiteSpace(english)) data.TitleTranslations["en"] = english;
+            if (!string.IsNullOrWhiteSpace(native)) data.TitleTranslations["ja"] = native;
         }
 
         var description = GetString(media, "description");
