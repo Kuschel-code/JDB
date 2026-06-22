@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace MetaHub.Identification.Naming;
@@ -14,6 +15,9 @@ public static partial class FilenameParser
 
     [GeneratedRegex(@"(?<!\d)(?<year>19\d{2}|20\d{2})(?!\d)", RegexOptions.Compiled)]
     private static partial Regex YearRegex();
+
+    [GeneratedRegex(@"\s+", RegexOptions.Compiled)]
+    private static partial Regex WhitespaceRegex();
 
     public static ParsedFileName Parse(string fileName)
     {
@@ -43,9 +47,37 @@ public static partial class FilenameParser
             .Replace('.', ' ')
             .Replace('_', ' ')
             .Trim(' ', '-', '(', '[');
-        title = Regex.Replace(title, @"\s+", " ").Trim();
+        title = Sanitize(title);
 
         return new ParsedFileName(title, year, season, episode);
+    }
+
+    /// <summary>
+    /// Removes characters that must never appear in a title — C0/C1 control codes, the Unicode
+    /// replacement char (U+FFFD, what an undecodable byte in a folder name becomes), and
+    /// zero-width / BOM marks — then collapses whitespace. Without this a folder whose name
+    /// contains a broken byte leaks a "K box" (U+FFFD) character into the metadata title.
+    /// </summary>
+    public static string Sanitize(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return string.Empty;
+
+        var sb = new StringBuilder(value.Length);
+        foreach (var ch in value)
+        {
+            int c = ch;
+            bool drop =
+                c <= 0x1F ||                       // C0 controls
+                (c >= 0x7F && c <= 0x9F) ||        // DEL + C1 controls
+                c == 0xFFFD ||                     // replacement char
+                (c >= 0x200B && c <= 0x200D) ||    // zero-width space / (non-)joiner
+                c == 0xFEFF;                       // BOM / zero-width no-break space
+            if (!drop)
+                sb.Append(ch);
+        }
+
+        return WhitespaceRegex().Replace(sb.ToString(), " ").Trim();
     }
 }
 

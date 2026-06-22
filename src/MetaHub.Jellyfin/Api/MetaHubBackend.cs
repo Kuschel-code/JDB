@@ -145,6 +145,16 @@ public class MetaHubBackend : IMetaHubBackend
             if (matches.Count == 0)
                 continue;
 
+            // Sequel guard: never let a folder with a season/sequel marker fall onto the base
+            // series (or vice versa). "Saiki K. Reawakened" must not resolve to "Saiki K.".
+            var wantedKey = SequelKey(name);
+            matches = matches
+                .Where(m => SequelKey(m.CanonicalTitle) == wantedKey
+                            || (m.OriginalTitle != null && SequelKey(m.OriginalTitle) == wantedKey))
+                .ToList();
+            if (matches.Count == 0)
+                continue;
+
             // Prefer an exact title hit over a punctuation-only (fuzzy) hit.
             var exact = matches
                 .Where(m => string.Equals(m.CanonicalTitle, name, StringComparison.OrdinalIgnoreCase)
@@ -180,6 +190,40 @@ public class MetaHubBackend : IMetaHubBackend
         foreach (var sep in new[] { " ", "/", "-", ":", ".", ",", "'", "!", "?", "_" })
             s = s.Replace(sep, string.Empty);
         return s;
+    }
+
+    /// <summary>
+    /// A stable "season/sequel signature" for a title: the set of markers that distinguish a
+    /// sequel/part/season/movie from the base entry. Two titles with different keys are
+    /// different works (e.g. base "" vs "reawakened", or season "2"). Used to stop near-identical
+    /// titles from cross-matching during name resolution.
+    /// </summary>
+    internal static string SequelKey(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+            return string.Empty;
+        var t = title.ToLowerInvariant();
+        var tokens = new SortedSet<string>(StringComparer.Ordinal);
+
+        // "season 2", "staffel 2", "part 2", "cour 2", "2nd season"
+        foreach (System.Text.RegularExpressions.Match m in
+                 System.Text.RegularExpressions.Regex.Matches(t, @"\b(?:season|staffel|part|cour)\s*0*([2-9])\b"))
+            tokens.Add(m.Groups[1].Value);
+        foreach (System.Text.RegularExpressions.Match m in
+                 System.Text.RegularExpressions.Regex.Matches(t, @"\b0*([2-9])(?:st|nd|rd|th)\b"))
+            tokens.Add(m.Groups[1].Value);
+
+        // Roman numerals II–IV as standalone words.
+        foreach (var (roman, num) in new[] { ("ii", "2"), ("iii", "3"), ("iv", "4") })
+            if (System.Text.RegularExpressions.Regex.IsMatch(t, $@"\b{roman}\b"))
+                tokens.Add(num);
+
+        // Keyword markers that denote a separate entry.
+        foreach (var kw in new[] { "reawaken", "final", "movie", "film", "ova", "ona", "special", "recap" })
+            if (System.Text.RegularExpressions.Regex.IsMatch(t, $@"\b{kw}"))
+                tokens.Add(kw);
+
+        return string.Join("|", tokens);
     }
 
     public async Task<EpisodeDto?> GetEpisodeAsync(
