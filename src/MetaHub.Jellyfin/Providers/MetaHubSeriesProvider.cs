@@ -35,15 +35,17 @@ public class MetaHubSeriesProvider : IRemoteMetadataProvider<Series, SeriesInfo>
         // No provider id matched — fall back to title matching (lookup name, then folder name),
         // biased by the library's media type so e.g. "227" finds the anime "22/7" in an Anime library.
         var preferredType = _classifier.Classify(info, config);
-        work ??= await _backend.ResolveByNameAsync(
-                MetaHubMapping.NameCandidates(info), info.Year, preferredType, config.PreferredLanguage, cancellationToken)
-            .ConfigureAwait(false);
+        if (work is null && config.MatchByName)
+            work = await _backend.ResolveByNameAsync(
+                MetaHubMapping.NameCandidates(info), info.Year, preferredType,
+                MetaHubMapping.FolderTitle(info.Path), config.PreferredLanguage, cancellationToken)
+                .ConfigureAwait(false);
 
         if (work is null)
         {
             // Last resort (user request): when nothing matches, at least supply the folder
             // name as the title so items never keep empty/garbage names.
-            var folderTitle = MetaHubMapping.FolderTitle(info.Path);
+            var folderTitle = config.MatchByName ? MetaHubMapping.FolderTitle(info.Path) : null;
             if (!string.IsNullOrWhiteSpace(folderTitle) && _gate.IsServed(info, "Series", config))
             {
                 result.HasMetadata = true;

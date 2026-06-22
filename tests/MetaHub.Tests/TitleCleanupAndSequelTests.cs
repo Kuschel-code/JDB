@@ -73,16 +73,22 @@ public class TitleCleanupAndSequelTests
             var backend = Backend(sp);
 
             // The sequel folder must map to the sequel work, never the base.
-            var reawakened = await backend.ResolveByNameAsync(
-                new[] { "The Disastrous Life of Saiki K. Reawakened" }, null, MediaType.Anime, null, CancellationToken.None);
+            var reawakened = await backend.ResolveByNameAsync(new[] { "The Disastrous Life of Saiki K. Reawakened" }, null, MediaType.Anime, null, null, CancellationToken.None);
             Assert.NotNull(reawakened);
             Assert.Equal("The Disastrous Life of Saiki K. Reawakened", reawakened!.CanonicalTitle);
 
             // The base folder (even without the trailing period) must map to the base work.
-            var baseWork = await backend.ResolveByNameAsync(
-                new[] { "The Disastrous Life of Saiki K" }, null, MediaType.Anime, null, CancellationToken.None);
+            var baseWork = await backend.ResolveByNameAsync(new[] { "The Disastrous Life of Saiki K" }, null, MediaType.Anime, null, null, CancellationToken.None);
             Assert.NotNull(baseWork);
             Assert.Equal("The Disastrous Life of Saiki K.", baseWork!.CanonicalTitle);
+
+            // The reported bug: Jellyfin hands us the *base* name as the first candidate, but the
+            // folder is the sequel. The folder name is authoritative → must pick the sequel work.
+            var viaFolder = await backend.ResolveByNameAsync(
+                new[] { "The Disastrous Life of Saiki K." }, null, MediaType.Anime,
+                "The Disastrous Life of Saiki K. Reawakened", null, CancellationToken.None);
+            Assert.NotNull(viaFolder);
+            Assert.Equal("The Disastrous Life of Saiki K. Reawakened", viaFolder!.CanonicalTitle);
         }
         finally
         {
@@ -113,8 +119,7 @@ public class TitleCleanupAndSequelTests
                 await db.SaveChangesAsync();
             }
 
-            var result = await Backend(sp).ResolveByNameAsync(
-                new[] { "The Disastrous Life of Saiki K" }, null, MediaType.Anime, null, CancellationToken.None);
+            var result = await Backend(sp).ResolveByNameAsync(new[] { "The Disastrous Life of Saiki K" }, null, MediaType.Anime, null, null, CancellationToken.None);
             Assert.Null(result);
         }
         finally

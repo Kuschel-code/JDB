@@ -17,10 +17,13 @@ public interface IMetaHubBackend
     /// order against canonical and original titles (case-insensitive, punctuation-insensitive so
     /// "227" matches "22/7"); a year, when given, disambiguates multiple matches. When
     /// <paramref name="preferredType"/> is set (from the item's library), only works of that
-    /// media type are considered. Returns null when no unambiguous match exists.
+    /// media type are considered. <paramref name="folderName"/> (the item's folder) is the
+    /// authority for the season/sequel distinction, so "… Reawakened" never resolves to the base
+    /// series. Returns null when no unambiguous match exists.
     /// </summary>
     Task<WorkDto?> ResolveByNameAsync(
-        IEnumerable<string> nameCandidates, int? year, MediaType? preferredType, string? lang, CancellationToken ct);
+        IEnumerable<string> nameCandidates, int? year, MediaType? preferredType,
+        string? folderName, string? lang, CancellationToken ct);
 
     /// <summary>Returns the artwork for a resolved work.</summary>
     Task<IReadOnlyList<ImageDto>> GetImagesAsync(Guid workId, CancellationToken ct);

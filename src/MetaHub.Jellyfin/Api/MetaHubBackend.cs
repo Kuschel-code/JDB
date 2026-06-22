@@ -95,11 +95,15 @@ public class MetaHubBackend : IMetaHubBackend
     }
 
     public async Task<WorkDto?> ResolveByNameAsync(
-        IEnumerable<string> nameCandidates, int? year, MediaType? preferredType, string? lang, CancellationToken ct)
+        IEnumerable<string> nameCandidates, int? year, MediaType? preferredType,
+        string? folderName, string? lang, CancellationToken ct)
     {
-        var names = nameCandidates
+        // The folder name is also a search candidate (tried first): it carries the sequel suffix
+        // a pre-set item name may be missing, and is needed to actually fetch the sequel work.
+        var names = new[] { folderName }
+            .Concat(nameCandidates)
             .Where(n => !string.IsNullOrWhiteSpace(n))
-            .Select(n => n.Trim())
+            .Select(n => n!.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
         if (names.Count == 0)
@@ -110,6 +114,12 @@ public class MetaHubBackend : IMetaHubBackend
             // Remote mode: title lookup is not exposed as a dedicated endpoint yet.
             return null;
         }
+
+        // The folder name is the authoritative source for the season/sequel distinction: a user
+        // organizes "… Reawakened" vs the base series by folder, while Jellyfin's pre-set item
+        // name may already be the wrong (base) name. When a folder name is given, its sequel key
+        // constrains every match; otherwise fall back to each candidate's own key.
+        var folderKey = string.IsNullOrWhiteSpace(folderName) ? null : SequelKey(folderName);
 
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
@@ -147,7 +157,8 @@ public class MetaHubBackend : IMetaHubBackend
 
             // Sequel guard: never let a folder with a season/sequel marker fall onto the base
             // series (or vice versa). "Saiki K. Reawakened" must not resolve to "Saiki K.".
-            var wantedKey = SequelKey(name);
+            // The folder's key wins over the (possibly base-named) candidate.
+            var wantedKey = folderKey ?? SequelKey(name);
             matches = matches
                 .Where(m => SequelKey(m.CanonicalTitle) == wantedKey
                             || (m.OriginalTitle != null && SequelKey(m.OriginalTitle) == wantedKey))
