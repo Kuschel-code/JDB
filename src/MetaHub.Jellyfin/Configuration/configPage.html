@@ -133,6 +133,16 @@
                             <input id="FallbackLanguage" type="text" is="emby-input" placeholder="en" />
                             <div class="fieldDescription">Used when the preferred language is not available.</div>
                         </div>
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="TitlePreference">Title to display</label>
+                            <select is="emby-select" id="TitlePreference">
+                                <option value="Localized">Preferred language (then English, then original)</option>
+                                <option value="English">English</option>
+                                <option value="Original">Original (e.g. Japanese)</option>
+                                <option value="Romaji">Romaji / canonical</option>
+                            </select>
+                            <div class="fieldDescription">Which title MetaHub sets as the item's main name.</div>
+                        </div>
                     </div>
 
                     <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
@@ -275,7 +285,7 @@
             var page, config, disabled, overrides, saveTimer;
 
             var checks = ['UseEmbeddedEngine','EnableMovies','EnableSeries','EnableAnime','EnableMusic','EnableBooks','EnrichOnDemand','AniDbEnabled'];
-            var texts = ['ApiBaseUrl','ApiKey','RequestTimeoutSeconds','PreferredLanguage','FallbackLanguage','WriteMode','TmdbApiKey','GoogleBooksApiKey','AnnictToken','AniDbClientName','AniDbClientVersion','AniDbUsername','AniDbPassword'];
+            var texts = ['ApiBaseUrl','ApiKey','RequestTimeoutSeconds','PreferredLanguage','FallbackLanguage','TitlePreference','WriteMode','TmdbApiKey','GoogleBooksApiKey','AnnictToken','AniDbClientName','AniDbClientVersion','AniDbUsername','AniDbPassword'];
 
             function norm(id) { return (id || '').replace(/-/g, '').toLowerCase(); }
             function isDisabled(id) { return disabled.indexOf(norm(id)) !== -1; }

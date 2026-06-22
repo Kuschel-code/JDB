@@ -48,6 +48,13 @@ public class PluginConfiguration : BasePluginConfiguration
     public string PreferredLanguage { get; set; } = "de";
     public string FallbackLanguage { get; set; } = "en";
 
+    /// <summary>
+    /// Which title MetaHub shows as the main name:
+    /// <c>Localized</c> (default: preferred language → English → canonical),
+    /// <c>English</c>, <c>Original</c> (native/Japanese), or <c>Romaji</c> (the canonical/manami title).
+    /// </summary>
+    public string TitlePreference { get; set; } = "Localized";
+
     // --- Embedded engine: enrichment ---
 
     /// <summary>"FillMissingOnly" (keep existing) or "Overwrite".</summary>
