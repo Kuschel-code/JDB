@@ -34,14 +34,16 @@ public class MetaHubMovieProvider : IRemoteMetadataProvider<Movie, MovieInfo>
 
         // No provider id matched — fall back to title matching, biased by the library's media type.
         var preferredType = _classifier.Classify(info, config);
-        work ??= await _backend.ResolveByNameAsync(
-                MetaHubMapping.NameCandidates(info), info.Year, preferredType, config.PreferredLanguage, cancellationToken)
-            .ConfigureAwait(false);
+        if (work is null && config.MatchByName)
+            work = await _backend.ResolveByNameAsync(
+                MetaHubMapping.NameCandidates(info), info.Year, preferredType,
+                MetaHubMapping.FolderTitle(info.Path), config.PreferredLanguage, cancellationToken)
+                .ConfigureAwait(false);
 
         if (work is null)
         {
             // Last resort: supply the cleaned file/folder name so titles are never empty.
-            var folderTitle = MetaHubMapping.FolderTitle(info.Path);
+            var folderTitle = config.MatchByName ? MetaHubMapping.FolderTitle(info.Path) : null;
             if (!string.IsNullOrWhiteSpace(folderTitle) && _gate.IsServed(info, "Movie", config))
             {
                 result.HasMetadata = true;

@@ -14,7 +14,6 @@ category: "Metadata"
 artifacts:
   - "MetaHub.Jellyfin.dll"
 changelog: >
-  0.1.8.1 - Configurable title: choose which name MetaHub shows (preferred language /
-  English / Original / Romaji) in the settings. Fix two similar series (Saiki K. base vs
-  "Reawakened") cross-matching via a season/sequel-marker guard. Sanitize titles so a broken
-  folder name no longer leaks a box (U+FFFD) character; real special characters are kept.
+  0.1.8.2 - Sequel recognition fix: the folder name is now authoritative, so "… Reawakened"
+  resolves to the sequel instead of the base series even when Jellyfin pre-set the base name.
+  New setting "Match by folder/file name when no ID matches" to toggle name-based matching.

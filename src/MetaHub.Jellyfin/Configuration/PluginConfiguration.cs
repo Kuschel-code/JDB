@@ -55,6 +55,13 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public string TitlePreference { get; set; } = "Localized";
 
+    /// <summary>
+    /// When true (default), if no provider id matches MetaHub resolves the work by the item's
+    /// folder/file name (the path is authoritative for the season/sequel distinction). Turn off
+    /// for strict id-only matching.
+    /// </summary>
+    public bool MatchByName { get; set; } = true;
+
     // --- Embedded engine: enrichment ---
 
     /// <summary>"FillMissingOnly" (keep existing) or "Overwrite".</summary>
