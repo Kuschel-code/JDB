@@ -335,7 +335,37 @@ public class MetaHubBackend : IMetaHubBackend
         return canonicalTitle;
     }
 
-    private static WorkDto ToDto(Work work, string? lang)
+    /// <summary>
+    /// Title selection honoring the user's <see cref="Configuration.PluginConfiguration.TitlePreference"/>:
+    /// <list type="bullet">
+    /// <item><c>Romaji</c> — the canonical (manami) title as-is.</item>
+    /// <item><c>English</c> — the English title, else canonical.</item>
+    /// <item><c>Original</c> — the native (e.g. Japanese) title, else canonical.</item>
+    /// <item><c>Localized</c> (default) — preferred language → English → canonical.</item>
+    /// </list>
+    /// </summary>
+    public static string PickTitle(
+        string canonicalTitle, string? originalTitle,
+        IReadOnlyDictionary<string, string> titleTranslations, string? preferredLanguage, string? preference)
+    {
+        switch ((preference ?? "Localized").Trim().ToLowerInvariant())
+        {
+            case "romaji" or "canonical":
+                return canonicalTitle;
+            case "english" or "en":
+                return Translation(titleTranslations, "en") ?? canonicalTitle;
+            case "original" or "native" or "japanese" or "ja":
+                return Translation(titleTranslations, "ja")
+                       ?? (string.IsNullOrWhiteSpace(originalTitle) ? canonicalTitle : originalTitle!);
+            default: // "localized" / unknown → existing behavior
+                return PickTitle(canonicalTitle, titleTranslations, preferredLanguage);
+        }
+    }
+
+    private static string? Translation(IReadOnlyDictionary<string, string> translations, string key)
+        => translations.TryGetValue(key, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
+
+    private WorkDto ToDto(Work work, string? lang)
     {
         var overview = work.Overview;
         if (!string.IsNullOrWhiteSpace(lang) &&
@@ -347,7 +377,8 @@ public class MetaHubBackend : IMetaHubBackend
         {
             Id = work.Id,
             MediaType = work.MediaType.ToString(),
-            CanonicalTitle = PickTitle(work.CanonicalTitle, work.TitleTranslations, lang),
+            CanonicalTitle = PickTitle(
+                work.CanonicalTitle, work.OriginalTitle, work.TitleTranslations, lang, Config.TitlePreference),
             OriginalTitle = work.OriginalTitle,
             ReleaseYear = work.ReleaseYear,
             Overview = overview,

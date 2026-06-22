@@ -14,6 +14,7 @@ category: "Metadata"
 artifacts:
   - "MetaHub.Jellyfin.dll"
 changelog: >
-  0.1.8.1 - Fix two similar series (e.g. Saiki K. base vs "Reawakened") cross-matching:
-  a season/sequel-marker guard keeps a sequel folder off the base series and vice versa.
-  Sanitize titles so a broken folder name no longer leaks a box (U+FFFD) character.
+  0.1.8.1 - Configurable title: choose which name MetaHub shows (preferred language /
+  English / Original / Romaji) in the settings. Fix two similar series (Saiki K. base vs
+  "Reawakened") cross-matching via a season/sequel-marker guard. Sanitize titles so a broken
+  folder name no longer leaks a box (U+FFFD) character; real special characters are kept.
