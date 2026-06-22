@@ -151,6 +151,14 @@
                             Uses the folder name (e.g. "… Reawakened") to find the right work and tell
                             similar series apart. Turn off for strict ID-only matching.
                         </div>
+                        <label class="checkboxContainer">
+                            <input id="PreferNameOverIds" type="checkbox" is="emby-checkbox" />
+                            <span>Prefer folder name over existing IDs</span>
+                        </label>
+                        <div class="fieldDescription">
+                            Match by folder name first, before provider IDs — useful when wrong/old IDs
+                            are baked into the files. Off = IDs win (recommended).
+                        </div>
                     </div>
 
                     <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
@@ -292,7 +300,7 @@
             var pluginId = 'a3f1c2d4-5b6e-47a8-9c0d-1e2f3a4b5c6d';
             var page, config, disabled, overrides, saveTimer;
 
-            var checks = ['UseEmbeddedEngine','EnableMovies','EnableSeries','EnableAnime','EnableMusic','EnableBooks','MatchByName','EnrichOnDemand','AniDbEnabled'];
+            var checks = ['UseEmbeddedEngine','EnableMovies','EnableSeries','EnableAnime','EnableMusic','EnableBooks','MatchByName','PreferNameOverIds','EnrichOnDemand','AniDbEnabled'];
             var texts = ['ApiBaseUrl','ApiKey','RequestTimeoutSeconds','PreferredLanguage','FallbackLanguage','TitlePreference','WriteMode','TmdbApiKey','GoogleBooksApiKey','AnnictToken','AniDbClientName','AniDbClientVersion','AniDbUsername','AniDbPassword'];
 
             function norm(id) { return (id || '').replace(/-/g, '').toLowerCase(); }

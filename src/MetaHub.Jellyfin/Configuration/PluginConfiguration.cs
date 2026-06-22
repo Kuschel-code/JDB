@@ -62,6 +62,13 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public bool MatchByName { get; set; } = true;
 
+    /// <summary>
+    /// When true, the folder/file name is tried <i>before</i> provider ids (only meaningful with
+    /// <see cref="MatchByName"/>). Useful when wrong/stale ids are baked into the library. Default
+    /// false — provider ids win.
+    /// </summary>
+    public bool PreferNameOverIds { get; set; }
+
     // --- Embedded engine: enrichment ---
 
     /// <summary>"FillMissingOnly" (keep existing) or "Overwrite".</summary>
