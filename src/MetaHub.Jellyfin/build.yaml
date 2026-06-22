@@ -14,6 +14,6 @@ category: "Metadata"
 artifacts:
   - "MetaHub.Jellyfin.dll"
 changelog: >
-  0.1.8.2 - Sequel recognition fix: the folder name is now authoritative, so "… Reawakened"
-  resolves to the sequel instead of the base series even when Jellyfin pre-set the base name.
-  New setting "Match by folder/file name when no ID matches" to toggle name-based matching.
+  0.1.8.2 - Folder name is authoritative for season/sequel recognition ("… Reawakened" no
+  longer resolves to the base series). New settings: "Match by folder/file name when no ID
+  matches" and "Prefer folder name over existing IDs" (for libraries with wrong/old IDs).

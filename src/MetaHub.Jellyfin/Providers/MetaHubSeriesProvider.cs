@@ -29,17 +29,21 @@ public class MetaHubSeriesProvider : IRemoteMetadataProvider<Series, SeriesInfo>
     {
         var result = new MetadataResult<Series>();
         var config = Plugin.Instance!.Configuration;
-        var work = await _backend.ResolveAsync(info.ProviderIds, config.PreferredLanguage, cancellationToken)
-            .ConfigureAwait(false);
-
-        // No provider id matched — fall back to title matching (lookup name, then folder name),
-        // biased by the library's media type so e.g. "227" finds the anime "22/7" in an Anime library.
         var preferredType = _classifier.Classify(info, config);
-        if (work is null && config.MatchByName)
-            work = await _backend.ResolveByNameAsync(
+
+        Task<WorkDto?> ById() =>
+            _backend.ResolveAsync(info.ProviderIds, config.PreferredLanguage, cancellationToken);
+        Task<WorkDto?> ByName() => config.MatchByName
+            ? _backend.ResolveByNameAsync(
                 MetaHubMapping.NameCandidates(info), info.Year, preferredType,
                 MetaHubMapping.FolderTitle(info.Path), config.PreferredLanguage, cancellationToken)
-                .ConfigureAwait(false);
+            : Task.FromResult<WorkDto?>(null);
+
+        // Default: provider ids first, then the folder/name fallback. With PreferNameOverIds the
+        // folder name wins (for libraries with wrong/stale ids baked into the files).
+        WorkDto? work = config.PreferNameOverIds
+            ? await ByName().ConfigureAwait(false) ?? await ById().ConfigureAwait(false)
+            : await ById().ConfigureAwait(false) ?? await ByName().ConfigureAwait(false);
 
         if (work is null)
         {
