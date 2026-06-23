@@ -3,7 +3,7 @@
 Durable context for future sessions. This is the project's "brain": what it is, how it's
 built, decisions made, gotchas, and what's left. Update it as the project evolves.
 
-_Last updated: 2026-06-15 · current release: v0.1.8.0_
+_Last updated: 2026-06-23 · current release: v0.1.8.2_
 
 ## What this is
 
@@ -49,10 +49,11 @@ docs/                       CONCEPT.md, CONFIGURATION.md, DATA_SOURCES.md, BRAIN
   `Npgsql.EntityFrameworkCore.PostgreSQL.dll`, `Polly.dll`, `Polly.Extensions.Http.dll`,
   `Microsoft.Extensions.Http.Polly.dll` + `build.yaml`. Bundling host-boundary assemblies
   (DI/Logging/Options/EF) breaks the plugin — never bundle those.
-- **Releases:** the integration token can NOT push tags or dispatch workflows (403,
-  no `actions: write`). To release, a human runs **Actions → Release → Run workflow** with a
-  version (e.g. `v0.1.7.8`); the workflow creates tag + release, builds zips, and updates
-  `manifest.json` on `main`. Tag push also works.
+- **Releases:** push a version tag — `git tag vX.Y.Z && git push origin vX.Y.Z` — and the
+  Release workflow (`on: push: tags: v*`) builds the zips + plugin, creates the GitHub release,
+  and updates `manifest.json` on `main`. This is how every release (v0.1.7.x–v0.1.8.2) was cut;
+  it needs only push access. (The manual **Actions → Run workflow** button needs `actions: write`,
+  which the integration token lacks — but the tag-push path does not, so prefer it.)
 - **Plugin install link (stable):**
   `https://raw.githubusercontent.com/Kuschel-code/JDB/main/manifest.json`
 - **SQLite gotcha:** can't `ORDER BY DateTimeOffset` — already handled; mirror any Replace
@@ -115,7 +116,7 @@ docs/                       CONCEPT.md, CONFIGURATION.md, DATA_SOURCES.md, BRAIN
 ## Release checklist
 
 1. Merge the PR to `main` (CI `build-test` must be green).
-2. Actions → Release → Run workflow → next `vX.Y.Z`.
+2. Tag and push the next `vX.Y.Z` (`git tag vX.Y.Z && git push origin vX.Y.Z`) → Release workflow runs. Then verify asset MD5 == manifest + DLL version == tag.
 3. In Jellyfin: update plugin → **restart**.
 4. Library → Manage → enable **MetaHub** under metadata + image providers (series/season/
    episode), move up.
@@ -133,4 +134,4 @@ docs/                       CONCEPT.md, CONFIGURATION.md, DATA_SOURCES.md, BRAIN
 - Cast & crew end to end.
 - Title/folder-name + library-aware fuzzy matching; posters at ingest; project logo.
 - Language-aware titles (TitleTranslations); "Apply metadata to library" task.
-- Released through v0.1.8.0.
+- Released through v0.1.8.2.
