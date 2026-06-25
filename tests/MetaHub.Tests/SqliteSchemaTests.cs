@@ -62,6 +62,38 @@ public class SqliteSchemaTests
     }
 
     [Fact]
+    public async Task Sqlite_connections_enable_WAL_and_a_busy_timeout()
+    {
+        // Concurrent scan reads + on-demand enrichment writes hit the same SQLite file; without WAL
+        // and a busy_timeout they raise "database is locked", which surfaces as silent metadata gaps.
+        var dbPath = Path.Combine(Path.GetTempPath(), $"metahub-pragma-{Guid.NewGuid():N}.db");
+        var sp = new ServiceCollection().AddMetaHubInfrastructureSqlite(dbPath).BuildServiceProvider();
+        try
+        {
+            sp.EnsureMetaHubSchemaCreated();
+            using var scope = sp.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+            await db.Database.OpenConnectionAsync(); // routes through the connection interceptor
+
+            var conn = db.Database.GetDbConnection();
+            long busy;
+            string journal;
+            using (var c = conn.CreateCommand()) { c.CommandText = "PRAGMA busy_timeout;"; busy = Convert.ToInt64(c.ExecuteScalar()); }
+            using (var c = conn.CreateCommand()) { c.CommandText = "PRAGMA journal_mode;"; journal = (string)c.ExecuteScalar()!; }
+            await db.Database.CloseConnectionAsync();
+
+            Assert.True(busy >= 3000, $"busy_timeout should be set; was {busy}");
+            Assert.Equal("wal", journal.ToLowerInvariant());
+        }
+        finally
+        {
+            sp.Dispose();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
+
+    [Fact]
     public async Task OrderBy_DateTimeOffset_translates_on_sqlite()
     {
         // Regression: SQLite stores DateTimeOffset as TEXT and cannot ORDER BY it. The embedded

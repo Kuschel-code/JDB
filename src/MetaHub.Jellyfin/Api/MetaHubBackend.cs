@@ -42,9 +42,19 @@ public class MetaHubBackend : IMetaHubBackend
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
 
-        Work? work = null;
-        if (await FindWorkIdAsync(db, providerIds, ct).ConfigureAwait(false) is { } wid)
-            work = await LoadWorkAsync(db, wid, ct).ConfigureAwait(false);
+        Work? work;
+        try
+        {
+            work = await FindWorkIdAsync(db, providerIds, ct).ConfigureAwait(false) is { } wid
+                ? await LoadWorkAsync(db, wid, ct).ConfigureAwait(false)
+                : null;
+        }
+        catch (System.Data.Common.DbException)
+        {
+            // Transient DB error (e.g. SQLITE_BUSY under concurrent scan+enrich) — fail soft so the
+            // provider's GetMetadata returns empty rather than throwing and being dropped.
+            return null;
+        }
 
         if (work is null)
             return null;
@@ -124,9 +134,14 @@ public class MetaHubBackend : IMetaHubBackend
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
 
+        try
+        {
         foreach (var name in names)
         {
-            var lowered = name.ToLowerInvariant();
+            // ASCII-only fold to mirror SQLite's lower() (see AsciiLower / NormTitle): full Unicode
+            // ToLowerInvariant would never compare equal to the EF-translated lower() for titles
+            // with a non-ASCII uppercase letter (Ō, Ä, Cyrillic…), silently failing the match.
+            var lowered = AsciiLower(name);
             var norm = NormTitle(name);
 
             // Restrict to the library's media type when known (e.g. only Anime in an "Anime" library).
@@ -187,20 +202,43 @@ public class MetaHubBackend : IMetaHubBackend
             if (work is not null)
                 return ToDto(work, lang);
         }
+        }
+        catch (System.Data.Common.DbException)
+        {
+            return null; // transient DB error — fail soft (name fallback is best-effort)
+        }
 
         return null;
     }
 
     /// <summary>Lowercase a title and strip common separators so "22/7" and "227" compare equal.
-    /// Must mirror the SQL Replace chain in <see cref="ResolveByNameAsync"/>.</summary>
+    /// Must mirror the SQL lower()+replace() chain in <see cref="ResolveByNameAsync"/>, including
+    /// the ASCII-only case fold (SQLite's lower() leaves non-ASCII letters untouched).</summary>
     private static string NormTitle(string? title)
     {
         if (string.IsNullOrEmpty(title))
             return string.Empty;
-        var s = title.ToLowerInvariant();
+        var s = AsciiLower(title);
         foreach (var sep in new[] { " ", "/", "-", ":", ".", ",", "'", "!", "?", "_" })
             s = s.Replace(sep, string.Empty);
         return s;
+    }
+
+    /// <summary>Lowercases ASCII A–Z only, exactly like SQLite's built-in <c>lower()</c>. EF Core
+    /// translates <c>string.ToLower()</c> to that ASCII-only function, so the C# side of every
+    /// title comparison must fold the same way or non-ASCII-uppercase titles never match.</summary>
+    private static string AsciiLower(string s)
+    {
+        char[]? buf = null;
+        for (var i = 0; i < s.Length; i++)
+        {
+            if (s[i] is >= 'A' and <= 'Z')
+            {
+                buf ??= s.ToCharArray();
+                buf[i] = (char)(s[i] + 32);
+            }
+        }
+        return buf is null ? s : new string(buf);
     }
 
     /// <summary>
@@ -307,8 +345,12 @@ public class MetaHubBackend : IMetaHubBackend
             if (!TryMapSource(source, out var src))
                 continue;
 
+            // Jellyfin uses one bare "Tmdb" key for both tv and movies, but their id spaces overlap,
+            // so a movie's id is stored under TmdbMovie (see Fribb ingest). Match either for TMDB.
+            var alsoTmdbMovie = src == ExternalIdSource.Tmdb;
             var workId = await db.ExternalIds
-                .Where(x => x.Source == src && x.ExternalValue == id)
+                .Where(x => x.ExternalValue == id
+                            && (x.Source == src || (alsoTmdbMovie && x.Source == ExternalIdSource.TmdbMovie)))
                 .Select(x => (Guid?)x.WorkId)
                 .FirstOrDefaultAsync(ct).ConfigureAwait(false);
 

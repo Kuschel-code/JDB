@@ -193,7 +193,17 @@ public class AnimeIngestService
             }
 
             TryAdd(ExternalIdSource.Tvdb, row.TvdbId);
-            TryAdd(ExternalIdSource.Tmdb, row.TmdbId);
+            // Route TMDB by its namespace so tv and movie ids (which share a numeric space) land
+            // under distinct sources instead of colliding: "movie:N" → TmdbMovie, "tv:N"/bare → Tmdb.
+            if (row.TmdbId is { } tmdb)
+            {
+                if (tmdb.StartsWith("movie:", StringComparison.Ordinal))
+                    TryAdd(ExternalIdSource.TmdbMovie, tmdb["movie:".Length..]);
+                else if (tmdb.StartsWith("tv:", StringComparison.Ordinal))
+                    TryAdd(ExternalIdSource.Tmdb, tmdb["tv:".Length..]);
+                else
+                    TryAdd(ExternalIdSource.Tmdb, tmdb);
+            }
             TryAdd(ExternalIdSource.Imdb, row.ImdbId);
             TryAdd(ExternalIdSource.Kitsu, row.KitsuId);
             TryAdd(ExternalIdSource.Mal, row.MalId);

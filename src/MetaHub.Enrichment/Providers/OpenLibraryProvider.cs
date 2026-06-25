@@ -46,11 +46,13 @@ public class OpenLibraryProvider : IMetadataProvider
         if (d.TryGetProperty("number_of_pages", out var pages) && pages.ValueKind == JsonValueKind.Number)
             data.PageCount = pages.GetInt32();
 
-        if (d.TryGetProperty("publishers", out var pubs) && pubs.ValueKind == JsonValueKind.Array)
-            data.Publisher = pubs.EnumerateArray().FirstOrDefault().GetString();
+        if (d.TryGetProperty("publishers", out var pubs) && pubs.ValueKind == JsonValueKind.Array
+            && pubs.EnumerateArray().FirstOrDefault() is { ValueKind: JsonValueKind.String } pub)
+            data.Publisher = pub.GetString();
 
-        if (d.TryGetProperty("isbn_13", out var isbns) && isbns.ValueKind == JsonValueKind.Array)
-            data.Isbn13 = isbns.EnumerateArray().FirstOrDefault().GetString();
+        if (d.TryGetProperty("isbn_13", out var isbns) && isbns.ValueKind == JsonValueKind.Array
+            && isbns.EnumerateArray().FirstOrDefault() is { ValueKind: JsonValueKind.String } isbn)
+            data.Isbn13 = isbn.GetString();
 
         if (d.TryGetProperty("covers", out var covers) && covers.ValueKind == JsonValueKind.Array)
         {

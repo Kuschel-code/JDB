@@ -133,4 +133,33 @@ public class AnimeIngestServiceTests
         Assert.Contains(work.ExternalIds, x => x.Source == ExternalIdSource.Tmdb && x.ExternalValue == "30991");
         Assert.Contains(work.ExternalIds, x => x.Source == ExternalIdSource.Imdb && x.ExternalValue == "tt0213338");
     }
+
+    [Fact]
+    public async Task MergeFribb_keeps_overlapping_tv_and_movie_tmdb_ids_without_collision()
+    {
+        await using var db = NewDb();
+        var service = new AnimeIngestService(db, NullLogger<AnimeIngestService>.Instance);
+        // Two different anime carrying the SAME bare TMDB number but in different id spaces.
+        await service.IngestManamiAsync(new ManamiDataset
+        {
+            Data =
+            {
+                new ManamiEntry { Title = "A TV Anime", Episodes = 12, Sources = { "https://anidb.net/anime/1" } },
+                new ManamiEntry { Title = "A Movie Anime", Episodes = 1, Sources = { "https://anidb.net/anime/2" } }
+            }
+        });
+
+        var result = await service.MergeFribbAsync(new[]
+        {
+            new FribbEntry { AniDbId = "1", TmdbId = "tv:26209" },
+            new FribbEntry { AniDbId = "2", TmdbId = "movie:26209" }
+        });
+
+        // Both ids are kept — the namespace stops the global (Source,Value) dedup from dropping one.
+        Assert.Equal(2, result.ExternalIdsAdded);
+
+        var ids = await db.ExternalIds.Where(x => x.ExternalValue == "26209").ToListAsync();
+        Assert.Contains(ids, x => x.Source == ExternalIdSource.Tmdb);      // the TV anime, bare id
+        Assert.Contains(ids, x => x.Source == ExternalIdSource.TmdbMovie); // the movie anime, bare id
+    }
 }

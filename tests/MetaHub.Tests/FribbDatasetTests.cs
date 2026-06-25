@@ -36,10 +36,10 @@ public class FribbDatasetTests
         Assert.Equal("1", first.AniDbId);
         Assert.Equal("290", first.AniListId);
         Assert.Equal("72025", first.TvdbId);   // tvdb_id, not thetvdb_id
-        Assert.Equal("26209", first.TmdbId);   // unwrapped from {"tv": 26209}
+        Assert.Equal("tv:26209", first.TmdbId); // namespaced from {"tv": 26209} — tv/movie id spaces overlap
         Assert.Equal("tt0286390", first.ImdbId);
 
-        Assert.Equal("12345", entries[1].TmdbId); // unwrapped from {"movie": 12345}
+        Assert.Equal("movie:12345", entries[1].TmdbId); // namespaced from {"movie": 12345}
 
         Assert.Null(entries[2].TmdbId);            // absent -> null, no throw
         Assert.Null(entries[2].TvdbId);

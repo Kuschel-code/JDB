@@ -97,4 +97,21 @@ public class EnrichmentParserTests
         Assert.Contains("Space", data.Genres);
         Assert.Contains(data.Images, i => i.Url == "https://img/mal.jpg");
     }
+
+    [Fact]
+    public void OpenLibrary_tolerates_empty_publisher_isbn_and_cover_arrays()
+    {
+        // Open Library returns empty arrays on valid 200s; FirstOrDefault().GetString() on an
+        // empty array throws InvalidOperationException and would abort book enrichment.
+        const string json = """
+        { "title": "Some Book", "publishers": [], "isbn_13": [], "covers": [] }
+        """;
+
+        var data = new OpenLibraryProvider(factory: null!).Parse(json);
+
+        Assert.Equal("Some Book", data.CanonicalTitle);
+        Assert.Null(data.Publisher);
+        Assert.Null(data.Isbn13);
+        Assert.Empty(data.Images);
+    }
 }
