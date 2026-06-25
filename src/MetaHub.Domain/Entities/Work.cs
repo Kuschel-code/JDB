@@ -17,6 +17,14 @@ public class Work
 
     public string? OriginalTitle { get; set; }
 
+    /// <summary>
+    /// Pipe-delimited, normalized set of every known title for this work (primary title plus all
+    /// synonyms/alternate titles, e.g. an anime's English name when <see cref="CanonicalTitle"/> is
+    /// the romaji). Lets name-based matching find a work by any of its titles. Built at ingest time
+    /// via <see cref="MetaHub.Domain.TitleNormalization.BuildSearchTitles"/>; empty until then.
+    /// </summary>
+    public string SearchTitles { get; set; } = string.Empty;
+
     public int? ReleaseYear { get; set; }
 
     /// <summary>Default overview text (typically EN). Translations live in <see cref="OverviewTranslations"/>.</summary>

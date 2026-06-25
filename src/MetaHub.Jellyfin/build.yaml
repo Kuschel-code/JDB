@@ -14,6 +14,7 @@ category: "Metadata"
 artifacts:
   - "MetaHub.Jellyfin.dll"
 changelog: >
-  0.1.8.2 - Folder name is authoritative for season/sequel recognition ("… Reawakened" no
-  longer resolves to the base series). New settings: "Match by folder/file name when no ID
-  matches" and "Prefer folder name over existing IDs" (for libraries with wrong/old IDs).
+  0.1.8.3 - Name matching now also searches each work's synonyms/alternate titles, so an item
+  whose folder uses an English name (e.g. "Even If the World Ends Tomorrow") is recognized even
+  when the canonical title is the romaji ("Ashita Sekai ga Owaru to Shitemo"). Re-run the anime
+  ingest task after updating so synonyms are indexed.
