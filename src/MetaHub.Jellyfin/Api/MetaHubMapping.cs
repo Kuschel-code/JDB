@@ -115,6 +115,7 @@ public static class MetaHubMapping
     private static string? ToJellyfinKey(string metaHubSource) => metaHubSource.ToLowerInvariant() switch
     {
         "tmdb" => "Tmdb",
+        "tmdbmovie" => "Tmdb", // movie ids live under TmdbMovie but map to Jellyfin's bare Tmdb key
         "tvdb" => "Tvdb",
         "imdb" => "Imdb",
         "anidb" => "AniDB",

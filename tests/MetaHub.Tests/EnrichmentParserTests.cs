@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Options;
+using MetaHub.Domain.Entities;
 using MetaHub.Domain.Enums;
+using MetaHub.Enrichment;
 using MetaHub.Enrichment.Providers;
 using Xunit;
 
@@ -113,5 +116,17 @@ public class EnrichmentParserTests
         Assert.Null(data.Publisher);
         Assert.Null(data.Isbn13);
         Assert.Empty(data.Images);
+    }
+
+    [Fact]
+    public void Tmdb_external_id_falls_back_to_the_tmdb_movie_source()
+    {
+        // Anime-movie works store their TMDB id under TmdbMovie; the provider must still resolve it
+        // (else enrichment silently skips them when only a movie id is present).
+        var provider = new TmdbProvider(factory: null!, Options.Create(new EnrichmentOptions()));
+        var work = new Work();
+        work.ExternalIds.Add(new ExternalId { Source = ExternalIdSource.TmdbMovie, ExternalValue = "777" });
+
+        Assert.Equal("777", provider.GetExternalId(work));
     }
 }

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using MetaHub.Domain.Enums;
 using MetaHub.Infrastructure;
@@ -161,5 +162,51 @@ public class AnimeIngestServiceTests
         var ids = await db.ExternalIds.Where(x => x.ExternalValue == "26209").ToListAsync();
         Assert.Contains(ids, x => x.Source == ExternalIdSource.Tmdb);      // the TV anime, bare id
         Assert.Contains(ids, x => x.Source == ExternalIdSource.TmdbMovie); // the movie anime, bare id
+    }
+
+    [Fact]
+    public async Task MergeFribb_is_idempotent_for_tmdb_movie_ids_on_a_relational_db()
+    {
+        // InMemory ignores unique indexes; a real (SQLite) DB is needed to catch a re-run that
+        // re-inserts a TmdbMovie id the cross-run dedup preload forgot to load -> UNIQUE violation.
+        var dbPath = Path.Combine(Path.GetTempPath(), $"metahub-fribb-rerun-{Guid.NewGuid():N}.db");
+        var sp = new ServiceCollection().AddMetaHubInfrastructureSqlite(dbPath).BuildServiceProvider();
+        try
+        {
+            sp.EnsureMetaHubSchemaCreated();
+
+            using (var scope = sp.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+                var service = new AnimeIngestService(db, NullLogger<AnimeIngestService>.Instance);
+                await service.IngestManamiAsync(new ManamiDataset
+                {
+                    Data = { new ManamiEntry { Title = "A Movie Anime", Episodes = 1, Sources = { "https://anidb.net/anime/2" } } }
+                });
+                var first = await service.MergeFribbAsync(new[] { new FribbEntry { AniDbId = "2", TmdbId = "movie:26209" } });
+                Assert.Equal(1, first.ExternalIdsAdded);
+            }
+
+            using (var scope = sp.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+                var service = new AnimeIngestService(db, NullLogger<AnimeIngestService>.Instance);
+                // Must be idempotent: not re-insert (TmdbMovie, 26209) and hit the unique index.
+                var second = await service.MergeFribbAsync(new[] { new FribbEntry { AniDbId = "2", TmdbId = "movie:26209" } });
+                Assert.Equal(0, second.ExternalIdsAdded);
+            }
+
+            using (var scope = sp.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+                Assert.Equal(1, await db.ExternalIds.CountAsync(x => x.Source == ExternalIdSource.TmdbMovie));
+            }
+        }
+        finally
+        {
+            sp.Dispose();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
     }
 }

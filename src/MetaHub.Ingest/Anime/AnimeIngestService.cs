@@ -158,6 +158,7 @@ public class AnimeIngestService
         var existing = (await _db.ExternalIds
                 .Where(x => x.Source == ExternalIdSource.Tvdb
                          || x.Source == ExternalIdSource.Tmdb
+                         || x.Source == ExternalIdSource.TmdbMovie
                          || x.Source == ExternalIdSource.Imdb
                          || x.Source == ExternalIdSource.Kitsu
                          || x.Source == ExternalIdSource.Mal

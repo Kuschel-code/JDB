@@ -88,20 +88,27 @@ public class MetaHubBackend : IMetaHubBackend
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
 
-        return await db.Images
-            .Where(i => i.WorkId == workId)
-            .OrderByDescending(i => i.Score)
-            .Select(i => new ImageDto
-            {
-                Type = i.Type.ToString(),
-                Url = i.Url,
-                Lang = i.Lang,
-                Width = i.Width,
-                Height = i.Height,
-                Source = i.Source,
-                Score = i.Score
-            })
-            .ToListAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return await db.Images
+                .Where(i => i.WorkId == workId)
+                .OrderByDescending(i => i.Score)
+                .Select(i => new ImageDto
+                {
+                    Type = i.Type.ToString(),
+                    Url = i.Url,
+                    Lang = i.Lang,
+                    Width = i.Width,
+                    Height = i.Height,
+                    Source = i.Source,
+                    Score = i.Score
+                })
+                .ToListAsync(ct).ConfigureAwait(false);
+        }
+        catch (System.Data.Common.DbException)
+        {
+            return Array.Empty<ImageDto>(); // transient DB error — fail soft (no artwork this pass)
+        }
     }
 
     public async Task<WorkDto?> ResolveByNameAsync(
@@ -301,6 +308,8 @@ public class MetaHubBackend : IMetaHubBackend
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
 
+        try
+        {
         var workId = await FindWorkIdAsync(db, seriesProviderIds, ct).ConfigureAwait(false);
         if (workId is null)
             return null;
@@ -334,6 +343,11 @@ public class MetaHubBackend : IMetaHubBackend
             AirDate = episode.AirDate,
             SeriesMediaType = mediaType
         };
+        }
+        catch (System.Data.Common.DbException)
+        {
+            return null; // transient DB error — fail soft
+        }
     }
 
     /// <summary>Finds the work referenced by any of the item's provider ids, in preference order.</summary>

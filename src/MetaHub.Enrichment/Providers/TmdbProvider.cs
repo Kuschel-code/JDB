@@ -30,14 +30,19 @@ public class TmdbProvider : IMetadataProvider
     public int Priority => 15;
 
     public string? GetExternalId(Work work)
-        => work.ExternalIds.FirstOrDefault(x => x.Source == ExternalIdSource.Tmdb)?.ExternalValue;
+        => work.ExternalIds.FirstOrDefault(x => x.Source == ExternalIdSource.Tmdb)?.ExternalValue
+           ?? work.ExternalIds.FirstOrDefault(x => x.Source == ExternalIdSource.TmdbMovie)?.ExternalValue;
 
     public async Task<string?> FetchRawAsync(Work work, string externalId, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(_options.TmdbApiKey))
             return null;
 
-        var kind = work.MediaType == MediaType.Movie ? "movie" : "tv";
+        // Use the movie endpoint when the id came from the TMDB movie space (stored under
+        // TmdbMovie), even for an anime work whose MediaType is not Movie.
+        var isMovieId = work.ExternalIds.Any(
+            x => x.Source == ExternalIdSource.TmdbMovie && x.ExternalValue == externalId);
+        var kind = isMovieId || work.MediaType == MediaType.Movie ? "movie" : "tv";
         var url = $"https://api.themoviedb.org/3/{kind}/{externalId}" +
                   $"?api_key={_options.TmdbApiKey}&append_to_response=credits";
 

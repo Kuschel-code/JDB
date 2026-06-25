@@ -148,6 +148,7 @@ public static class NfoBuilder
     private static string? JellyfinType(ExternalIdSource source) => source switch
     {
         ExternalIdSource.Tmdb => "tmdb",
+        ExternalIdSource.TmdbMovie => "tmdb", // movie ids export under the same NFO uniqueid type
         ExternalIdSource.Imdb => "imdb",
         ExternalIdSource.Tvdb => "tvdb",
         ExternalIdSource.AniDb => "anidb",
