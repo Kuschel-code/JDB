@@ -1,7 +1,7 @@
 ---
 name: "MetaHub"
 guid: "a3f1c2d4-5b6e-47a8-9c0d-1e2f3a4b5c6d"
-version: "0.1.8.0"
+version: "0.1.8.4"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 owner: "kuschel-code"
@@ -14,6 +14,11 @@ category: "Metadata"
 artifacts:
   - "MetaHub.Jellyfin.dll"
 changelog: >
+  0.1.8.4 - Stability fixes from a code audit: the embedded SQLite database now uses WAL +
+  busy_timeout and the read paths fail soft, so concurrent library scans no longer drop an item's
+  metadata with "database is locked"; the "Apply metadata to library" task no longer aborts on a
+  single bad item; book enrichment tolerates empty Open Library fields; TMDB tv vs movie ids no
+  longer collide; and titles with a non-ASCII uppercase letter now match by name.
   0.1.8.3 - Name matching now also searches each work's synonyms/alternate titles, so an item
   whose folder uses an English name (e.g. "Even If the World Ends Tomorrow") is recognized even
   when the canonical title is the romaji ("Ashita Sekai ga Owaru to Shitemo"). Re-run the anime

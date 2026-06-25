@@ -85,13 +85,25 @@ public class MetaHubApplyTask : IScheduledTask
             if (!changes.HasAny)
                 continue;
 
-            if (changes.Name is not null) item.Name = changes.Name;
-            if (changes.Overview is not null) item.Overview = changes.Overview;
-            if (changes.ProductionYear is not null) item.ProductionYear = changes.ProductionYear;
+            try
+            {
+                if (changes.Name is not null) item.Name = changes.Name;
+                if (changes.Overview is not null) item.Overview = changes.Overview;
+                if (changes.ProductionYear is not null) item.ProductionYear = changes.ProductionYear;
 
-            await _libraryManager.UpdateItemAsync(item, item.GetParent(), ItemUpdateType.MetadataEdit, cancellationToken)
-                .ConfigureAwait(false);
-            updated++;
+                await _libraryManager.UpdateItemAsync(item, item.GetParent(), ItemUpdateType.MetadataEdit, cancellationToken)
+                    .ConfigureAwait(false);
+                updated++;
+            }
+            catch (OperationCanceledException)
+            {
+                throw; // honor task cancellation
+            }
+            catch (Exception ex)
+            {
+                // One bad item (DB lock, IO, malformed parent) must not abort the whole library walk.
+                _log.LogDebug(ex, "MetaHub apply: update failed for {Name}", item.Name);
+            }
         }
 
         progress.Report(100);

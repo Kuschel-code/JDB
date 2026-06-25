@@ -12,15 +12,35 @@ public static class TitleNormalization
     public static readonly string[] Separators =
         { " ", "/", "-", ":", ".", ",", "'", "!", "?", "_" };
 
-    /// <summary>Lowercases <paramref name="title"/> and removes every separator.</summary>
+    /// <summary>Lowercases <paramref name="title"/> (ASCII A–Z only) and removes every separator.
+    /// The ASCII-only fold mirrors SQLite's <c>lower()</c> exactly, so the C# side of a name match
+    /// compares equal to the EF-translated query even for titles with a non-ASCII uppercase letter
+    /// (Ō, Ä, Cyrillic…); a full-Unicode <c>ToLowerInvariant</c> would silently never match those.</summary>
     public static string Normalize(string? title)
     {
         if (string.IsNullOrEmpty(title))
             return string.Empty;
-        var s = title.ToLowerInvariant();
+        var s = AsciiLower(title);
         foreach (var sep in Separators)
             s = s.Replace(sep, string.Empty);
         return s;
+    }
+
+    /// <summary>Lowercases ASCII A–Z only, exactly like SQLite's built-in <c>lower()</c>. EF Core
+    /// translates <c>string.ToLower()</c> to that ASCII-only function, so the C# side of every
+    /// title comparison must fold the same way or non-ASCII-uppercase titles never match.</summary>
+    public static string AsciiLower(string s)
+    {
+        char[]? buf = null;
+        for (var i = 0; i < s.Length; i++)
+        {
+            if (s[i] is >= 'A' and <= 'Z')
+            {
+                buf ??= s.ToCharArray();
+                buf[i] = (char)(s[i] + 32);
+            }
+        }
+        return buf is null ? s : new string(buf);
     }
 
     /// <summary>

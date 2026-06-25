@@ -28,7 +28,8 @@ public static class DependencyInjection
         this IServiceCollection services, string databasePath)
     {
         services.AddDbContext<MetaHubDbContext>(options =>
-            options.UseSqlite($"Data Source={databasePath}"));
+            options.UseSqlite($"Data Source={databasePath}")
+                   .AddInterceptors(new SqlitePragmaInterceptor()));
 
         return services;
     }
@@ -41,7 +42,8 @@ public static class DependencyInjection
         this IServiceCollection services, Func<IServiceProvider, string> databasePathFactory)
     {
         services.AddDbContext<MetaHubDbContext>((sp, options) =>
-            options.UseSqlite($"Data Source={databasePathFactory(sp)}"));
+            options.UseSqlite($"Data Source={databasePathFactory(sp)}")
+                   .AddInterceptors(new SqlitePragmaInterceptor()));
 
         return services;
     }
@@ -80,6 +82,11 @@ public static class DependencyInjection
         {
             db.Database.EnsureCreated();
         }
+
+        // Enable WAL once on a writable connection: it persists in the database header and lets the
+        // concurrent scan readers and the single enrichment writer coexist without "database is
+        // locked". The per-connection busy_timeout is handled by SqlitePragmaInterceptor.
+        db.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
     }
 
     private static long ReadSqliteUserVersion(MetaHubDbContext db)

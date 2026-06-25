@@ -65,4 +65,17 @@ public class NfoBuilderTests
         var tmdb = doc.Root.Elements("uniqueid").Single(u => (string?)u.Attribute("type") == "tmdb");
         Assert.Equal("true", tmdb.Attribute("default")!.Value.ToLowerInvariant());
     }
+
+    [Fact]
+    public void TmdbMovie_id_is_exported_as_a_tmdb_uniqueid()
+    {
+        // Anime-movie works store their TMDB id under TmdbMovie; it must still appear as a
+        // <uniqueid type="tmdb"> in the NFO (else cross-referencing breaks for those works).
+        var work = new Work { MediaType = MediaType.Anime, CanonicalTitle = "A Movie Anime", ReleaseYear = 2010 };
+        work.ExternalIds.Add(new ExternalId { Source = ExternalIdSource.TmdbMovie, ExternalValue = "26209" });
+
+        var doc = XDocument.Parse(NfoBuilder.Build(work));
+        var tmdb = doc.Root!.Elements("uniqueid").Single(u => (string?)u.Attribute("type") == "tmdb");
+        Assert.Equal("26209", tmdb.Value);
+    }
 }

@@ -88,16 +88,19 @@ public class FribbObjectIdConverter : JsonConverter<string?>
 
         if (el.ValueKind == JsonValueKind.Object)
         {
-            // Prefer the TV id (anime series), then movie, then any scalar member.
+            // TMDB's tv and movie id spaces overlap, so keep the namespace ("tv:"/"movie:") — the
+            // ingest stores them under distinct sources (Tmdb / TmdbMovie) instead of colliding on a
+            // bare number under the unique (Source, ExternalValue) index. Prefer tv, then movie.
             foreach (var name in new[] { "tv", "movie" })
             {
                 if (el.TryGetProperty(name, out var preferred)
                     && FlexibleStringConverter.ScalarToString(preferred) is { } id)
                 {
-                    return id;
+                    return $"{name}:{id}";
                 }
             }
 
+            // Unexpected wrapper shape: fall back to the first scalar member, unnamespaced.
             foreach (var prop in el.EnumerateObject())
             {
                 if (FlexibleStringConverter.ScalarToString(prop.Value) is { } id)

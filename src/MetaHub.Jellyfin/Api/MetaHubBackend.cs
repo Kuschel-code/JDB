@@ -42,9 +42,19 @@ public class MetaHubBackend : IMetaHubBackend
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
 
-        Work? work = null;
-        if (await FindWorkIdAsync(db, providerIds, ct).ConfigureAwait(false) is { } wid)
-            work = await LoadWorkAsync(db, wid, ct).ConfigureAwait(false);
+        Work? work;
+        try
+        {
+            work = await FindWorkIdAsync(db, providerIds, ct).ConfigureAwait(false) is { } wid
+                ? await LoadWorkAsync(db, wid, ct).ConfigureAwait(false)
+                : null;
+        }
+        catch (System.Data.Common.DbException)
+        {
+            // Transient DB error (e.g. SQLITE_BUSY under concurrent scan+enrich) — fail soft so the
+            // provider's GetMetadata returns empty rather than throwing and being dropped.
+            return null;
+        }
 
         if (work is null)
             return null;
@@ -78,20 +88,27 @@ public class MetaHubBackend : IMetaHubBackend
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
 
-        return await db.Images
-            .Where(i => i.WorkId == workId)
-            .OrderByDescending(i => i.Score)
-            .Select(i => new ImageDto
-            {
-                Type = i.Type.ToString(),
-                Url = i.Url,
-                Lang = i.Lang,
-                Width = i.Width,
-                Height = i.Height,
-                Source = i.Source,
-                Score = i.Score
-            })
-            .ToListAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return await db.Images
+                .Where(i => i.WorkId == workId)
+                .OrderByDescending(i => i.Score)
+                .Select(i => new ImageDto
+                {
+                    Type = i.Type.ToString(),
+                    Url = i.Url,
+                    Lang = i.Lang,
+                    Width = i.Width,
+                    Height = i.Height,
+                    Source = i.Source,
+                    Score = i.Score
+                })
+                .ToListAsync(ct).ConfigureAwait(false);
+        }
+        catch (System.Data.Common.DbException)
+        {
+            return Array.Empty<ImageDto>(); // transient DB error — fail soft (no artwork this pass)
+        }
     }
 
     public async Task<WorkDto?> ResolveByNameAsync(
@@ -124,9 +141,14 @@ public class MetaHubBackend : IMetaHubBackend
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
 
+        try
+        {
         foreach (var name in names)
         {
-            var lowered = name.ToLowerInvariant();
+            // ASCII-only fold to mirror SQLite's lower() (see TitleNormalization.AsciiLower): full
+            // Unicode ToLowerInvariant would never compare equal to the EF-translated lower() for a
+            // title with a non-ASCII uppercase letter (Ō, Ä, Cyrillic…), silently failing the match.
+            var lowered = MetaHub.Domain.TitleNormalization.AsciiLower(name);
             var norm = NormTitle(name);
             // Segment needle for the per-work searchable title set (primary title + synonyms).
             var needle = MetaHub.Domain.TitleNormalization.SearchNeedle(name);
@@ -193,13 +215,19 @@ public class MetaHubBackend : IMetaHubBackend
             if (work is not null)
                 return ToDto(work, lang);
         }
+        }
+        catch (System.Data.Common.DbException)
+        {
+            return null; // transient DB error — fail soft (name fallback is best-effort)
+        }
 
         return null;
     }
 
     /// <summary>Lowercase a title and strip common separators so "22/7" and "227" compare equal.
-    /// Must mirror the SQL Replace chain in <see cref="ResolveByNameAsync"/>; shared with the
-    /// ingest so a work's stored <see cref="Work.SearchTitles"/> normalize the same way.</summary>
+    /// Must mirror the SQL lower()+replace() chain in <see cref="ResolveByNameAsync"/> (ASCII-only
+    /// fold); shared with the ingest so a work's stored <see cref="Work.SearchTitles"/> normalize
+    /// the same way.</summary>
     private static string NormTitle(string? title) => MetaHub.Domain.TitleNormalization.Normalize(title);
 
     /// <summary>
@@ -262,6 +290,8 @@ public class MetaHubBackend : IMetaHubBackend
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
 
+        try
+        {
         var workId = await FindWorkIdAsync(db, seriesProviderIds, ct).ConfigureAwait(false);
         if (workId is null)
             return null;
@@ -295,6 +325,11 @@ public class MetaHubBackend : IMetaHubBackend
             AirDate = episode.AirDate,
             SeriesMediaType = mediaType
         };
+        }
+        catch (System.Data.Common.DbException)
+        {
+            return null; // transient DB error — fail soft
+        }
     }
 
     /// <summary>Finds the work referenced by any of the item's provider ids, in preference order.</summary>
@@ -306,8 +341,12 @@ public class MetaHubBackend : IMetaHubBackend
             if (!TryMapSource(source, out var src))
                 continue;
 
+            // Jellyfin uses one bare "Tmdb" key for both tv and movies, but their id spaces overlap,
+            // so a movie's id is stored under TmdbMovie (see Fribb ingest). Match either for TMDB.
+            var alsoTmdbMovie = src == ExternalIdSource.Tmdb;
             var workId = await db.ExternalIds
-                .Where(x => x.Source == src && x.ExternalValue == id)
+                .Where(x => x.ExternalValue == id
+                            && (x.Source == src || (alsoTmdbMovie && x.Source == ExternalIdSource.TmdbMovie)))
                 .Select(x => (Guid?)x.WorkId)
                 .FirstOrDefaultAsync(ct).ConfigureAwait(false);
 

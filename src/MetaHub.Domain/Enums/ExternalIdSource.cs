@@ -13,6 +13,9 @@ public enum ExternalIdSource
     Tvdb = 2,
     Imdb = 3,
     Trakt = 4,
+    /// <summary>TMDB <i>movie</i> id. TMDB's movie and tv id spaces overlap, so movie ids live in
+    /// their own source to avoid colliding with <see cref="Tmdb"/> (tv) under the unique index.</summary>
+    TmdbMovie = 5,
 
     // Anime
     AniList = 10,

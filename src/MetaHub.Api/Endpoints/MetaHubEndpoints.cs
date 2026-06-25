@@ -86,13 +86,17 @@ public static class MetaHubEndpoints
         if (!TryParseSource(source, out var src))
             return Results.BadRequest($"Unknown source '{source}'.");
 
+        // A bare "tmdb" lookup must also match movie ids stored under TmdbMovie (TMDB's tv and movie
+        // id spaces overlap), mirroring the embedded FindWorkIdAsync.
+        var alsoTmdbMovie = src == ExternalIdSource.Tmdb;
         var work = await db.Works
             .Include(w => w.ExternalIds)
             .Include(w => w.Credits).ThenInclude(c => c.Person)
             .AsSplitQuery()
             .AsNoTracking()
             .FirstOrDefaultAsync(
-                w => w.ExternalIds.Any(x => x.Source == src && x.ExternalValue == id), ct);
+                w => w.ExternalIds.Any(x => x.ExternalValue == id
+                    && (x.Source == src || (alsoTmdbMovie && x.Source == ExternalIdSource.TmdbMovie))), ct);
 
         return work is null ? Results.NotFound() : Results.Ok(ToResponse(work, lang));
     }
