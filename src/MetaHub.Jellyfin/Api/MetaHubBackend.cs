@@ -128,14 +128,19 @@ public class MetaHubBackend : IMetaHubBackend
         {
             var lowered = name.ToLowerInvariant();
             var norm = NormTitle(name);
+            // Segment needle for the per-work searchable title set (primary title + synonyms).
+            var needle = MetaHub.Domain.TitleNormalization.SearchNeedle(name);
 
             // Restrict to the library's media type when known (e.g. only Anime in an "Anime" library).
             var query = db.Works.AsQueryable();
             if (preferredType is { } pt)
                 query = query.Where(w => w.MediaType == pt);
 
-            // Exact (case-insensitive) OR punctuation-insensitive match so a folder "227" finds
-            // the anime "22/7". The Replace chain is translated to SQLite replace() by EF Core.
+            // Exact (case-insensitive) OR punctuation-insensitive match so a folder "227" finds the
+            // anime "22/7"; plus a match against the work's full title set (SearchTitles) so a folder
+            // named after a synonym — e.g. the English "Even If the World Ends Tomorrow" — finds the
+            // romaji entry "Ashita Sekai ga Owaru to Shitemo". The Replace chain and Contains are
+            // translated to SQLite replace()/instr() by EF Core.
             var matches = await query
                 .Where(w =>
                     w.CanonicalTitle.ToLower() == lowered
@@ -147,7 +152,8 @@ public class MetaHubBackend : IMetaHubBackend
                     || (w.OriginalTitle != null && w.OriginalTitle.ToLower()
                         .Replace(" ", "").Replace("/", "").Replace("-", "").Replace(":", "")
                         .Replace(".", "").Replace(",", "").Replace("'", "").Replace("!", "")
-                        .Replace("?", "").Replace("_", "") == norm))
+                        .Replace("?", "").Replace("_", "") == norm)
+                    || (w.SearchTitles != "" && w.SearchTitles.Contains(needle)))
                 .Select(w => new { w.Id, w.ReleaseYear, w.CanonicalTitle, w.OriginalTitle })
                 .Take(8)
                 .ToListAsync(ct).ConfigureAwait(false);
@@ -192,16 +198,9 @@ public class MetaHubBackend : IMetaHubBackend
     }
 
     /// <summary>Lowercase a title and strip common separators so "22/7" and "227" compare equal.
-    /// Must mirror the SQL Replace chain in <see cref="ResolveByNameAsync"/>.</summary>
-    private static string NormTitle(string? title)
-    {
-        if (string.IsNullOrEmpty(title))
-            return string.Empty;
-        var s = title.ToLowerInvariant();
-        foreach (var sep in new[] { " ", "/", "-", ":", ".", ",", "'", "!", "?", "_" })
-            s = s.Replace(sep, string.Empty);
-        return s;
-    }
+    /// Must mirror the SQL Replace chain in <see cref="ResolveByNameAsync"/>; shared with the
+    /// ingest so a work's stored <see cref="Work.SearchTitles"/> normalize the same way.</summary>
+    private static string NormTitle(string? title) => MetaHub.Domain.TitleNormalization.Normalize(title);
 
     /// <summary>
     /// A stable "season/sequel signature" for a title: the set of markers that distinguish a

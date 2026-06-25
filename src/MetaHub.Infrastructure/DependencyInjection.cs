@@ -51,7 +51,7 @@ public static class DependencyInjection
     /// that <see cref="DatabaseFacade.EnsureCreated"/> cannot reconcile on an existing file
     /// (e.g. a column's storage type changes), so the cache is rebuilt instead of breaking.
     /// </summary>
-    private const long EmbeddedSchemaVersion = 3;
+    private const long EmbeddedSchemaVersion = 4;
 
     /// <summary>
     /// Creates the SQLite schema if it does not exist yet (embedded mode). The embedded

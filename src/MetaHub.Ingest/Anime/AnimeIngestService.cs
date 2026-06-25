@@ -274,6 +274,13 @@ public class AnimeIngestService
         if (!string.IsNullOrWhiteSpace(entry.Title))
             work.CanonicalTitle = entry.Title;
 
+        // Make every known title searchable: the primary title plus all manami synonyms (which
+        // carry the English/localized names when the primary is romaji). Without this an item
+        // named after a synonym — e.g. "Even If the World Ends Tomorrow" vs the romaji
+        // "Ashita Sekai ga Owaru to Shitemo" — would never match by name.
+        work.SearchTitles = MetaHub.Domain.TitleNormalization.BuildSearchTitles(
+            new[] { entry.Title, work.OriginalTitle }.Concat(entry.Synonyms));
+
         work.ReleaseYear ??= entry.AnimeSeason?.Year;
         work.Status = MapStatus(entry.Status);
         work.UpdatedAt = DateTimeOffset.UtcNow;
