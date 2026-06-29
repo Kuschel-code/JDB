@@ -18,6 +18,7 @@ public static class DependencyInjection
 
         AddResilientClient(services, AniListProvider.HttpClientName);
         AddResilientClient(services, JikanProvider.HttpClientName);
+        AddResilientClient(services, KitsuProvider.HttpClientName);
         AddResilientClient(services, TmdbProvider.HttpClientName);
         AddResilientClient(services, MusicBrainzProvider.HttpClientName);
         AddResilientClient(services, OpenLibraryProvider.HttpClientName);
@@ -27,6 +28,7 @@ public static class DependencyInjection
         // Anime
         services.AddScoped<IMetadataProvider, AniListProvider>();
         services.AddScoped<IMetadataProvider, JikanProvider>();
+        services.AddScoped<IMetadataProvider, KitsuProvider>();
         // Movies / series (and complementary anime)
         services.AddScoped<IMetadataProvider, TmdbProvider>();
         // Music

@@ -69,6 +69,8 @@ public class MetaHubSeriesProvider : IRemoteMetadataProvider<Series, SeriesInfo>
             Overview = work.Overview,
             ProductionYear = work.ReleaseYear
         };
+        if (work.Genres.Count > 0)
+            result.Item.Genres = work.Genres.ToArray();
         MetaHubMapping.ApplyProviderIds(result.Item, work);
         MetaHubMapping.ApplyPeople(result, work);
         return result;
