@@ -1,7 +1,7 @@
 ---
 name: "MetaHub"
 guid: "a3f1c2d4-5b6e-47a8-9c0d-1e2f3a4b5c6d"
-version: "0.1.8.7"
+version: "0.1.8.8"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 owner: "kuschel-code"
@@ -14,6 +14,11 @@ category: "Metadata"
 artifacts:
   - "MetaHub.Jellyfin.dll"
 changelog: >
+  0.1.8.8 - Anime continuations whose distinguishing marker lives only in a synonym now resolve
+  correctly. "The Disastrous Life of Saiki K. Reawakened" (manami canonical "Saiki Kusuo no
+  Psi-nan: Psi-shidou-hen", with "Reawakened" only as an English synonym) no longer falls back to
+  the base season's ids/overview: the sequel guard now also accepts an exact synonym match when the
+  folder itself carries the marker. Refresh affected items after updating.
   0.1.8.7 - New Kitsu metadata provider (kitsu.app, no API key): fills overview, year, episode count
   and artwork for anime that manami links only to Kitsu/anime-planet and that the richer providers
   cannot fetch (e.g. "The Red Turtle"); Kitsu and AnimePlanet ids are now stamped onto the item and
