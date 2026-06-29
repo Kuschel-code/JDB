@@ -8,9 +8,13 @@ namespace MetaHub.Domain;
 /// </summary>
 public static class TitleNormalization
 {
-    /// <summary>The separators removed from a title before comparison.</summary>
+    /// <summary>The separators removed from a title before comparison. Includes brackets and
+    /// parentheses: manami/AniList canonicals wrap a part name in square brackets
+    /// ("… [Heaven's Feel] I. presage flower") while libraries are filed with round parentheses or
+    /// none, and the two must compare equal. Mirrored by the SQL Replace chain in
+    /// <see cref="MetaHub.Jellyfin.Api.MetaHubBackend"/>.ResolveByNameAsync — keep both in sync.</summary>
     public static readonly string[] Separators =
-        { " ", "/", "-", ":", ".", ",", "'", "!", "?", "_" };
+        { " ", "/", "-", ":", ".", ",", "'", "!", "?", "_", "(", ")", "[", "]", "{", "}" };
 
     /// <summary>Lowercases <paramref name="title"/> (ASCII A–Z only) and removes every separator.
     /// The ASCII-only fold mirrors SQLite's <c>lower()</c> exactly, so the C# side of a name match
