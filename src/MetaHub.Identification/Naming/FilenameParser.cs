@@ -19,9 +19,25 @@ public static partial class FilenameParser
     [GeneratedRegex(@"\s+", RegexOptions.Compiled)]
     private static partial Regex WhitespaceRegex();
 
+    /// <summary>
+    /// Real media-file extensions. The input is often a DIRECTORY name (anime is filed by folder),
+    /// and titles legitimately end in ". subtitle" — "Fate/stay night [Heaven's Feel] I. presage
+    /// flower" or "Dr. Stone". Stripping at the last dot unconditionally (Path.GetFileNameWithout-
+    /// Extension) would amputate the subtitle and the year, so only strip when the suffix is one of
+    /// these known extensions.
+    /// </summary>
+    private static readonly HashSet<string> MediaExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mkv", ".mp4", ".m4v", ".avi", ".mov", ".wmv", ".flv", ".webm", ".ts", ".m2ts",
+        ".mpg", ".mpeg", ".ogm", ".rm", ".rmvb", ".vob", ".divx", ".iso", ".strm"
+    };
+
     public static ParsedFileName Parse(string fileName)
     {
-        var name = Path.GetFileNameWithoutExtension(fileName);
+        var ext = Path.GetExtension(fileName);
+        var name = !string.IsNullOrEmpty(ext) && MediaExtensions.Contains(ext)
+            ? fileName[..^ext.Length]
+            : fileName;
 
         int? season = null, episode = null;
         var se = SeasonEpisodeRegex().Match(name);

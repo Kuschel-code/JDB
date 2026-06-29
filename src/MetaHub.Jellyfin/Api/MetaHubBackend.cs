@@ -165,10 +165,15 @@ public class MetaHubBackend : IMetaHubBackend
             // Segment needle for the per-work searchable title set (primary title + synonyms).
             var needle = MetaHub.Domain.TitleNormalization.SearchNeedle(name);
 
-            // Restrict to the library's media type when known (e.g. only Anime in an "Anime" library).
+            // Restrict to the library's media type when known. Every manami anime work — including
+            // films and OVAs — is stored as MediaType.Anime, so a library typed Movie/Series (e.g.
+            // "Filme") must still accept Anime works; an Anime library stays strict so it can prefer
+            // the anime "22/7" over the US series "227".
             var query = db.Works.AsQueryable();
             if (preferredType is { } pt)
-                query = query.Where(w => w.MediaType == pt);
+                query = pt is MediaType.Movie or MediaType.Series
+                    ? query.Where(w => w.MediaType == pt || w.MediaType == MediaType.Anime)
+                    : query.Where(w => w.MediaType == pt);
 
             // Exact (case-insensitive) OR punctuation-insensitive match so a folder "227" finds the
             // anime "22/7"; plus a match against the work's full title set (SearchTitles) so a folder
@@ -277,8 +282,11 @@ public class MetaHubBackend : IMetaHubBackend
             if (System.Text.RegularExpressions.Regex.IsMatch(t, $@"\b{roman}\b"))
                 tokens.Add(num);
 
-        // Keyword markers that denote a separate entry.
-        foreach (var kw in new[] { "reawaken", "final", "movie", "film", "ova", "ona", "special", "recap" })
+        // Content markers that denote a genuinely different ENTRY (a sequel/continuation) and must
+        // match. Format-only words (movie/film/ova/ona/special/recap) are deliberately NOT here:
+        // they describe the same work's release form and libraries routinely omit them, so a manami
+        // canonical "Fate/stay night Movie: …" must still match a folder "Fate/stay night …".
+        foreach (var kw in new[] { "reawaken", "final" })
             if (System.Text.RegularExpressions.Regex.IsMatch(t, $@"\b{kw}"))
                 tokens.Add(kw);
 
