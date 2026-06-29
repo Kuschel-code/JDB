@@ -121,6 +121,8 @@ public static class MetaHubMapping
         "anidb" => "AniDB",
         "anilist" => "AniList",
         "mal" => "MyAnimeList",
+        "kitsu" => "Kitsu",
+        "animeplanet" => "AnimePlanet",
         "musicbrainz" => "MusicBrainzAlbum",
         "isbn" => "Isbn",
         _ => null

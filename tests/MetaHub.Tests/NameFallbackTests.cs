@@ -158,4 +158,42 @@ public class NameFallbackTests
             if (File.Exists(dbPath)) File.Delete(dbPath);
         }
     }
+
+    [Fact]
+    public async Task ResolveByProviderId_matches_a_kitsu_id()
+    {
+        // Some manami entries link only to Kitsu/anime-planet (no AniList/MAL/AniDB), e.g. "The Red
+        // Turtle". The image provider resolves a work by its stamped provider ids, so a Kitsu id
+        // must round-trip (ProviderIdMapper + TryMapSource) or those works get no MetaHub artwork.
+        var dbPath = Path.Combine(Path.GetTempPath(), $"metahub-kitsu-{Guid.NewGuid():N}.db");
+        var sp = new ServiceCollection().AddMetaHubInfrastructureSqlite(dbPath).AddHttpClient().BuildServiceProvider();
+        try
+        {
+            sp.EnsureMetaHubSchemaCreated();
+            using (var scope = sp.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+                var work = new Work { MediaType = MediaType.Anime, CanonicalTitle = "The Red Turtle" };
+                work.ExternalIds.Add(new ExternalId { Source = ExternalIdSource.Kitsu, ExternalValue = "11621" });
+                db.Works.Add(work);
+                await db.SaveChangesAsync();
+            }
+
+            var backend = new MetaHubBackend(
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                sp.GetRequiredService<IHttpClientFactory>(),
+                () => new PluginConfiguration { UseEmbeddedEngine = true, EnrichOnDemand = false });
+
+            var hit = await backend.ResolveAsync(
+                new Dictionary<string, string> { ["Kitsu"] = "11621" }, null, CancellationToken.None);
+            Assert.NotNull(hit);
+            Assert.Equal("The Red Turtle", hit!.CanonicalTitle);
+        }
+        finally
+        {
+            sp.Dispose();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
 }

@@ -15,6 +15,8 @@ public static class ProviderIdMapper
         ("AniList", "anilist"),
         ("MyAnimeList", "mal"),
         ("Mal", "mal"),
+        ("Kitsu", "kitsu"),
+        ("AnimePlanet", "animeplanet"),
         ("MusicBrainzAlbum", "musicbrainz"),
         ("MusicBrainz", "musicbrainz"),
         ("Isbn", "isbn")

@@ -489,6 +489,8 @@ public class MetaHubBackend : IMetaHubBackend
             "imdb" => ExternalIdSource.Imdb,
             "anilist" => ExternalIdSource.AniList,
             "mal" => ExternalIdSource.Mal,
+            "kitsu" => ExternalIdSource.Kitsu,
+            "animeplanet" => ExternalIdSource.AnimePlanet,
             "musicbrainz" => ExternalIdSource.MusicBrainz,
             "isbn" => ExternalIdSource.Isbn,
             _ => ExternalIdSource.Unknown
