@@ -390,6 +390,7 @@ public class MetaHubBackend : IMetaHubBackend
         => db.Works
             .Include(w => w.ExternalIds)
             .Include(w => w.Credits).ThenInclude(c => c.Person)
+            .Include(w => w.WorkGenres).ThenInclude(g => g.Genre)
             .AsSplitQuery()
             .AsNoTracking()
             .FirstOrDefaultAsync(w => w.Id == id, ct);
@@ -461,6 +462,11 @@ public class MetaHubBackend : IMetaHubBackend
             ReleaseYear = work.ReleaseYear,
             Overview = overview,
             Status = work.Status.ToString(),
+            Genres = work.WorkGenres
+                .Where(g => g.Genre != null && !string.IsNullOrWhiteSpace(g.Genre.Name))
+                .Select(g => g.Genre!.Name)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
             ExternalIds = work.ExternalIds
                 .Select(x => new ExternalIdDto { Source = x.Source.ToString(), Value = x.ExternalValue })
                 .ToList(),
