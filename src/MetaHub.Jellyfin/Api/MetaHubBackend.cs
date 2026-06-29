@@ -60,21 +60,33 @@ public class MetaHubBackend : IMetaHubBackend
             return null;
 
         // On-demand enrichment when the work has not been enriched yet (best-effort).
-        if (Config.EnrichOnDemand && string.IsNullOrWhiteSpace(work.Overview))
-        {
-            try
-            {
-                var enrichment = scope.ServiceProvider.GetRequiredService<EnrichmentService>();
-                await enrichment.EnrichAsync(work.Id, false, null, ct).ConfigureAwait(false);
-                work = await LoadWorkAsync(db, work.Id, ct).ConfigureAwait(false) ?? work;
-            }
-            catch
-            {
-                // Enrichment is best-effort; serve whatever is already stored.
-            }
-        }
+        work = await EnrichOnDemandAsync(scope, db, work, ct).ConfigureAwait(false);
 
         return ToDto(work, lang);
+    }
+
+    /// <summary>
+    /// Best-effort on-demand enrichment: when enabled and the work still has no overview, fetch
+    /// and merge provider data, then reload. Failures are swallowed (serve whatever is stored).
+    /// Shared by id- and name-based resolution so a folder-name match fills overview/artwork/people
+    /// just like an id match — otherwise a name-matched work is served with only its ingest data
+    /// (title + a lone manami poster, no overview/cast).
+    /// </summary>
+    private async Task<Work> EnrichOnDemandAsync(IServiceScope scope, MetaHubDbContext db, Work work, CancellationToken ct)
+    {
+        if (!Config.EnrichOnDemand || !string.IsNullOrWhiteSpace(work.Overview))
+            return work;
+
+        try
+        {
+            var enrichment = scope.ServiceProvider.GetRequiredService<EnrichmentService>();
+            await enrichment.EnrichAsync(work.Id, false, null, ct).ConfigureAwait(false);
+            return await LoadWorkAsync(db, work.Id, ct).ConfigureAwait(false) ?? work;
+        }
+        catch
+        {
+            return work; // best-effort: serve whatever is already stored
+        }
     }
 
     public async Task<IReadOnlyList<ImageDto>> GetImagesAsync(Guid workId, CancellationToken ct)
@@ -170,11 +182,15 @@ public class MetaHubBackend : IMetaHubBackend
                     || w.CanonicalTitle.ToLower()
                         .Replace(" ", "").Replace("/", "").Replace("-", "").Replace(":", "")
                         .Replace(".", "").Replace(",", "").Replace("'", "").Replace("!", "")
-                        .Replace("?", "").Replace("_", "") == norm
+                        .Replace("?", "").Replace("_", "")
+                        .Replace("(", "").Replace(")", "").Replace("[", "").Replace("]", "")
+                        .Replace("{", "").Replace("}", "") == norm
                     || (w.OriginalTitle != null && w.OriginalTitle.ToLower()
                         .Replace(" ", "").Replace("/", "").Replace("-", "").Replace(":", "")
                         .Replace(".", "").Replace(",", "").Replace("'", "").Replace("!", "")
-                        .Replace("?", "").Replace("_", "") == norm)
+                        .Replace("?", "").Replace("_", "")
+                        .Replace("(", "").Replace(")", "").Replace("[", "").Replace("]", "")
+                        .Replace("{", "").Replace("}", "") == norm)
                     || (w.SearchTitles != "" && w.SearchTitles.Contains(needle)))
                 .Select(w => new { w.Id, w.ReleaseYear, w.CanonicalTitle, w.OriginalTitle })
                 .Take(8)
@@ -213,7 +229,12 @@ public class MetaHubBackend : IMetaHubBackend
 
             var work = await LoadWorkAsync(db, pick.Id, ct).ConfigureAwait(false);
             if (work is not null)
+            {
+                // Same on-demand enrichment as the id path, so a folder-name match also gets
+                // overview/artwork/people instead of just the manami title.
+                work = await EnrichOnDemandAsync(scope, db, work, ct).ConfigureAwait(false);
                 return ToDto(work, lang);
+            }
         }
         }
         catch (System.Data.Common.DbException)
