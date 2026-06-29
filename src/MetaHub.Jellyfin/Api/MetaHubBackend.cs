@@ -197,7 +197,7 @@ public class MetaHubBackend : IMetaHubBackend
                         .Replace("(", "").Replace(")", "").Replace("[", "").Replace("]", "")
                         .Replace("{", "").Replace("}", "") == norm)
                     || (w.SearchTitles != "" && w.SearchTitles.Contains(needle)))
-                .Select(w => new { w.Id, w.ReleaseYear, w.CanonicalTitle, w.OriginalTitle })
+                .Select(w => new { w.Id, w.ReleaseYear, w.CanonicalTitle, w.OriginalTitle, w.SearchTitles })
                 .Take(8)
                 .ToListAsync(ct).ConfigureAwait(false);
 
@@ -208,8 +208,15 @@ public class MetaHubBackend : IMetaHubBackend
             // series (or vice versa). "Saiki K. Reawakened" must not resolve to "Saiki K.".
             // The folder's key wins over the (possibly base-named) candidate.
             var wantedKey = folderKey ?? SequelKey(name);
+            var nameKey = SequelKey(name);
             matches = matches
-                .Where(m => SequelKey(m.CanonicalTitle) == wantedKey
+                // An exact synonym/title hit for a candidate that itself carries the wanted sequel
+                // marker is unambiguous: e.g. the folder "… Reawakened" matching the work whose
+                // synonym is "…: Reawakened", even though that work's canonical is the romaji
+                // "…Psi-shidou-hen" with no marker. Trust it, rather than judging the work only by
+                // its canonical/original title (which would wrongly drop the right continuation).
+                .Where(m => (nameKey == wantedKey && m.SearchTitles != "" && m.SearchTitles.Contains(needle))
+                            || SequelKey(m.CanonicalTitle) == wantedKey
                             || (m.OriginalTitle != null && SequelKey(m.OriginalTitle) == wantedKey))
                 .ToList();
             if (matches.Count == 0)
