@@ -14,12 +14,15 @@ category: "Metadata"
 artifacts:
   - "MetaHub.Jellyfin.dll"
 changelog: >
-  0.1.8.5 - Anime films, OVAs and specials whose canonical title wraps a part name in brackets
-  (e.g. "Fate/stay night [Heaven's Feel] I. presage flower") are now matched even when the library
-  folder uses round parentheses or no brackets, so they get their provider ids, overview, artwork
-  and cast instead of just a bare folder title. Name (folder) matches now also run on-demand
-  enrichment like id matches, so a folder-matched work fills its overview/images/people. Re-run the
-  anime ingest task once to refresh the search index for bracketed synonyms.
+  0.1.8.5 - Anime films, OVAs and specials now get their ids, overview, artwork and cast instead of
+  just a bare folder title. Several name-matching gaps are fixed: titles with brackets/parentheses
+  ("Fate/stay night [Heaven's Feel] I. presage flower") now match a folder using either form; folder
+  names ending in a "I."/"II." part are no longer truncated at the dot (the subtitle and year
+  survived); a "Movie:" in the canonical title no longer blocks a folder that omits it; and anime
+  films/OVAs placed in a library named "Filme"/"Movies"/"Serien" are no longer filtered out by media
+  type. Name (folder) matches now also run on-demand enrichment like id matches, so a folder-matched
+  work fills its overview/images/people. Re-run the anime ingest task once so the search index picks
+  up the new normalization.
   0.1.8.4 - Stability fixes from a code audit: the embedded SQLite database now uses WAL +
   busy_timeout and the read paths fail soft, so concurrent library scans no longer drop an item's
   metadata with "database is locked"; the "Apply metadata to library" task no longer aborts on a
