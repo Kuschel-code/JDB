@@ -77,17 +77,44 @@ public class MetaHubBackend : IMetaHubBackend
         if (!Config.EnrichOnDemand || !string.IsNullOrWhiteSpace(work.Overview))
             return work;
 
+        // Serialize on-demand enrichment of the SAME work: during a library scan two item refreshes
+        // of one series can hit the same workId at once and race on Person/Genre inserts (Person.Name
+        // is not unique; Genre.Name is) -> DbUpdateException, swallowed, enrichment lost. Striped
+        // locks keep different works concurrent while making the same work one-at-a-time.
+        var gate = EnrichLockFor(work.Id);
+        await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            // Another refresh may have enriched this work while we were waiting for the lock.
+            var overview = await db.Works.Where(w => w.Id == work.Id)
+                .Select(w => w.Overview).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(overview))
+                return await LoadWorkAsync(db, work.Id, ct).ConfigureAwait(false) ?? work;
+
             var enrichment = scope.ServiceProvider.GetRequiredService<EnrichmentService>();
             await enrichment.EnrichAsync(work.Id, false, null, ct).ConfigureAwait(false);
             return await LoadWorkAsync(db, work.Id, ct).ConfigureAwait(false) ?? work;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {
             return work; // best-effort: serve whatever is already stored
         }
+        finally
+        {
+            gate.Release();
+        }
     }
+
+    // 32 striped locks: the same work serializes, different works stay concurrent (and bounded — no
+    // per-work dictionary growth). MetaHubBackend is a singleton, so static is correct.
+    private static readonly SemaphoreSlim[] EnrichLocks =
+        Enumerable.Range(0, 32).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
+
+    private static SemaphoreSlim EnrichLockFor(Guid id) => EnrichLocks[(uint)id.GetHashCode() % EnrichLocks.Length];
 
     public async Task<IReadOnlyList<ImageDto>> GetImagesAsync(Guid workId, CancellationToken ct)
     {

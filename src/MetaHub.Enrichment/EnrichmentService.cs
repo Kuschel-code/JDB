@@ -72,39 +72,46 @@ public class EnrichmentService
             if (externalId is null)
                 continue;
 
-            string? body = forceRefresh ? null : await GetCachedBodyAsync(workId, provider.Source, ttl, ct);
-            bool fromCache = body is not null;
-
-            if (body is null)
-            {
-                body = await provider.FetchRawAsync(work, externalId, ct);
-                if (body is null)
-                {
-                    result.Misses.Add(provider.Source.ToString());
-                    continue;
-                }
-
-                await StoreRawAsync(workId, provider.Source, body, ct);
-                await UpdateFetchLogAsync(provider.Source, ct);
-            }
-
+            // Isolate each provider: a failed fetch (network/timeout after Polly retries) or a bad
+            // parse must not abort the whole work's enrichment and discard the other providers' data.
             try
             {
+                string? body = forceRefresh ? null : await GetCachedBodyAsync(workId, provider.Source, ttl, ct);
+                bool fromCache = body is not null;
+
+                if (body is null)
+                {
+                    body = await provider.FetchRawAsync(work, externalId, ct);
+                    if (body is null)
+                    {
+                        result.Misses.Add(provider.Source.ToString());
+                        continue;
+                    }
+
+                    await StoreRawAsync(workId, provider.Source, body, ct);
+                    await UpdateFetchLogAsync(provider.Source, ct);
+                }
+
                 collected.Add(provider.Parse(body));
                 result.Applied.Add($"{provider.Source}{(fromCache ? " (cached)" : "")}");
             }
+            catch (OperationCanceledException)
+            {
+                throw; // honor cancellation
+            }
             catch (Exception ex)
             {
-                _log.LogWarning(ex, "Failed to parse {Source} payload for work {WorkId}", provider.Source, workId);
+                _log.LogWarning(ex, "Enrichment from {Source} failed for work {WorkId}", provider.Source, workId);
             }
         }
 
         if (collected.Count > 0)
-        {
             await new WorkMerger(_db).ApplyAsync(
                 work, collected, writeMode ?? _options.WriteMode, _options.PreferredLanguage, ct);
-            await _db.SaveChangesAsync(ct);
-        }
+
+        // Persist the merged fields AND any fetched raw payloads / fetch-log updates — even when every
+        // parse failed — so a successful fetch is cached and not re-requested (and re-rate-limited).
+        await _db.SaveChangesAsync(ct);
 
         await SyncEpisodesIfMissingAsync(work, forceRefresh, ct);
 

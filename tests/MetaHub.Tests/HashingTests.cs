@@ -38,6 +38,46 @@ public class HashingTests
     }
 
     [Fact]
+    public async Task Ed2k_multi_chunk_equals_md4_of_concatenated_chunk_hashes()
+    {
+        // The real path for any actual anime file (>= one 9,728,000-byte chunk) was never exercised.
+        // Validate the chunking against MD4(MD4(chunk0) || MD4(chunk1)) using the RFC-verified Md4.
+        const int chunk = Ed2kHasher.ChunkSize;
+        var data = new byte[chunk + 12_345];
+        for (var i = 0; i < data.Length; i++) data[i] = (byte)((i * 131 + 7) & 0xFF);
+
+        var concat = new byte[32];
+        Md4.Hash(data.AsSpan(0, chunk)).CopyTo(concat.AsSpan(0));
+        Md4.Hash(data.AsSpan(chunk)).CopyTo(concat.AsSpan(16));
+        var expected = Convert.ToHexString(Md4.Hash(concat)).ToLowerInvariant();
+
+        using var stream = new MemoryStream(data);
+        var hash = await Ed2kHasher.ComputeAsync(stream);
+
+        Assert.Equal(expected, hash);
+        // And it must NOT collapse to a single-chunk MD4 of the whole buffer.
+        Assert.NotEqual(Convert.ToHexString(Md4.Hash(data)).ToLowerInvariant(), hash);
+    }
+
+    [Fact]
+    public async Task Ed2k_exact_multiple_uses_the_no_trailing_empty_chunk_variant()
+    {
+        // A file of exactly N*ChunkSize has two ED2K conventions; this impl uses the eMule variant
+        // (no trailing empty chunk). Pin that so a regression is caught.
+        const int chunk = Ed2kHasher.ChunkSize;
+        var data = new byte[2 * chunk];
+        for (var i = 0; i < data.Length; i++) data[i] = (byte)(i & 0xFF);
+
+        var concat = new byte[32];
+        Md4.Hash(data.AsSpan(0, chunk)).CopyTo(concat.AsSpan(0));
+        Md4.Hash(data.AsSpan(chunk, chunk)).CopyTo(concat.AsSpan(16));
+        var expected = Convert.ToHexString(Md4.Hash(concat)).ToLowerInvariant();
+
+        using var stream = new MemoryStream(data);
+        Assert.Equal(expected, await Ed2kHasher.ComputeAsync(stream));
+    }
+
+    [Fact]
     public async Task Crc32_known_value()
     {
         // CRC32 of "123456789" is the standard check value 0xCBF43926.
