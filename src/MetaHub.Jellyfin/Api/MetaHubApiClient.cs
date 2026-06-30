@@ -115,6 +115,7 @@ public class WorkDto
     public string? Overview { get; set; }
     public string Status { get; set; } = string.Empty;
     public List<string> Genres { get; set; } = new();
+    public List<string> Studios { get; set; } = new();
     public List<ExternalIdDto> ExternalIds { get; set; } = new();
     public List<PersonDto> People { get; set; } = new();
 }

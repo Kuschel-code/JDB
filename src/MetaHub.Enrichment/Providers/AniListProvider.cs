@@ -23,6 +23,7 @@ query ($id: Int) {
     startDate { year }
     episodes
     genres
+    studios(isMain: true) { nodes { name } }
     coverImage { extraLarge color }
     bannerImage
     characters(sort: [ROLE, RELEVANCE], perPage: 15) {
@@ -106,6 +107,13 @@ query ($id: Int) {
         if (media.TryGetProperty("genres", out var genres) && genres.ValueKind == JsonValueKind.Array)
             foreach (var g in genres.EnumerateArray())
                 if (g.GetString() is { } name) data.Genres.Add(name);
+
+        // Main animation studio(s) -> stored as Studio-role credits (surfaced as item Studios).
+        if (media.TryGetProperty("studios", out var studios)
+            && studios.TryGetProperty("nodes", out var studioNodes) && studioNodes.ValueKind == JsonValueKind.Array)
+            foreach (var s in studioNodes.EnumerateArray())
+                if (GetString(s, "name") is { } studioName)
+                    data.Credits.Add(new NormalizedCredit { Name = studioName, Role = CreditRole.Studio });
 
         ParseCredits(media, data);
 

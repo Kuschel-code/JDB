@@ -78,6 +78,12 @@ public class TmdbProvider : IMetadataProvider
             foreach (var g in genres.EnumerateArray())
                 if (GetString(g, "name") is { } name) data.Genres.Add(name);
 
+        // Production companies -> Studio-role credits (surfaced as item Studios).
+        if (d.TryGetProperty("production_companies", out var companies) && companies.ValueKind == JsonValueKind.Array)
+            foreach (var c in companies.EnumerateArray())
+                if (GetString(c, "name") is { } companyName)
+                    data.Credits.Add(new NormalizedCredit { Name = companyName, Role = CreditRole.Studio });
+
         ParseCredits(d, data);
 
         if (GetString(d, "poster_path") is { } poster)

@@ -35,6 +35,9 @@ public class EnrichmentOptions
     public string TmdbApiKey { get; set; } = string.Empty;
     public string GoogleBooksApiKey { get; set; } = string.Empty;
 
+    /// <summary>fanart.tv API key for high-quality posters/backgrounds/logos. Empty = provider skipped.</summary>
+    public string FanArtApiKey { get; set; } = string.Empty;
+
     /// <summary>Annict personal access token (annict.com) for Japanese anime metadata.</summary>
     public string AnnictToken { get; set; } = string.Empty;
 }

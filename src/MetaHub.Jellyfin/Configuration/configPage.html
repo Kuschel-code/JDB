@@ -218,6 +218,11 @@
                             <div class="fieldDescription">Optional, improves book lookups. Without a key, Open Library is used.</div>
                         </div>
                         <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="FanArtApiKey">fanart.tv API key</label>
+                            <input id="FanArtApiKey" type="password" is="emby-input" />
+                            <div class="fieldDescription">High-quality posters, backgrounds and clear logos (anime via TVDB, movies via TMDB). Free key at fanart.tv; skipped without one.</div>
+                        </div>
+                        <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="AnnictToken">Annict access token (Japanese metadata)</label>
                             <input id="AnnictToken" type="password" is="emby-input" />
                             <div class="fieldDescription">
@@ -301,7 +306,7 @@
             var page, config, disabled, overrides, saveTimer;
 
             var checks = ['UseEmbeddedEngine','EnableMovies','EnableSeries','EnableAnime','EnableMusic','EnableBooks','MatchByName','PreferNameOverIds','EnrichOnDemand','AniDbEnabled'];
-            var texts = ['ApiBaseUrl','ApiKey','RequestTimeoutSeconds','PreferredLanguage','FallbackLanguage','TitlePreference','WriteMode','TmdbApiKey','GoogleBooksApiKey','AnnictToken','AniDbClientName','AniDbClientVersion','AniDbUsername','AniDbPassword'];
+            var texts = ['ApiBaseUrl','ApiKey','RequestTimeoutSeconds','PreferredLanguage','FallbackLanguage','TitlePreference','WriteMode','TmdbApiKey','GoogleBooksApiKey','FanArtApiKey','AnnictToken','AniDbClientName','AniDbClientVersion','AniDbUsername','AniDbPassword'];
 
             function norm(id) { return (id || '').replace(/-/g, '').toLowerCase(); }
             function isDisabled(id) { return disabled.indexOf(norm(id)) !== -1; }
