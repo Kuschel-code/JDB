@@ -474,12 +474,19 @@ public class MetaHubBackend : IMetaHubBackend
                 .Select(g => g.Genre!.Name)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList(),
+            // Studios are stored as Studio-role credits (no schema change); surface them separately.
+            Studios = work.Credits
+                .Where(c => c.Role == MetaHub.Domain.Enums.CreditRole.Studio && c.Person is not null
+                            && !string.IsNullOrWhiteSpace(c.Person.Name))
+                .Select(c => c.Person!.Name)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
             ExternalIds = work.ExternalIds
                 .Select(x => new ExternalIdDto { Source = x.Source.ToString(), Value = x.ExternalValue })
                 .ToList(),
             People = work.Credits
                 .OrderBy(c => c.Order)
-                .Where(c => c.Person is not null)
+                .Where(c => c.Person is not null && c.Role != MetaHub.Domain.Enums.CreditRole.Studio)
                 .Select(c => new PersonDto
                 {
                     Name = c.Person!.Name,

@@ -107,4 +107,48 @@ public class MediaProviderParserTests
         Assert.Contains("Fiction", data.Genres);
         Assert.Contains(data.Images, i => i.Url == "https://books/thumb.jpg");
     }
+
+    [Fact]
+    public void AniList_parses_main_studio_as_a_studio_credit()
+    {
+        const string json = """
+        { "data": { "Media": {
+            "title": { "romaji": "Fate/stay night [Heaven's Feel]", "english": null, "native": "フェイト" },
+            "genres": ["Action"],
+            "studios": { "nodes": [ { "name": "ufotable" } ] }
+        } } }
+        """;
+        var data = new AniListProvider(factory: null!).Parse(json);
+        Assert.Contains(data.Credits, c => c.Role == CreditRole.Studio && c.Name == "ufotable");
+    }
+
+    [Fact]
+    public void Tmdb_parses_production_companies_as_studio_credits()
+    {
+        const string json = """
+        { "title": "Akira", "production_companies": [ { "name": "TMS Entertainment" }, { "name": "Akira Committee" } ] }
+        """;
+        var data = new TmdbProvider(factory: null!, Opts()).Parse(json);
+        Assert.Contains(data.Credits, c => c.Role == CreditRole.Studio && c.Name == "TMS Entertainment");
+        Assert.Contains(data.Credits, c => c.Role == CreditRole.Studio && c.Name == "Akira Committee");
+    }
+
+    [Fact]
+    public void FanArt_parses_posters_backgrounds_logos_with_language()
+    {
+        const string json = """
+        {
+          "name": "Fate/stay night", "thetvdb_id": "439228",
+          "tvposter": [ { "id": "1", "url": "https://fanart/poster.jpg", "lang": "de", "likes": "7" } ],
+          "showbackground": [ { "id": "2", "url": "https://fanart/bg.jpg", "lang": "", "likes": "3" } ],
+          "hdtvlogo": [ { "id": "3", "url": "https://fanart/logo.png", "lang": "en", "likes": "2" } ]
+        }
+        """;
+        var data = new FanArtTvProvider(factory: null!, Opts()).Parse(json);
+
+        Assert.Equal(ExternalIdSource.FanArtTv, data.Source);
+        Assert.Contains(data.Images, i => i.Type == ImageType.Poster && i.Url.EndsWith("poster.jpg") && i.Lang == "de");
+        Assert.Contains(data.Images, i => i.Type == ImageType.Backdrop && i.Lang == null); // "" -> neutral
+        Assert.Contains(data.Images, i => i.Type == ImageType.Logo && i.Url.EndsWith("logo.png") && i.Lang == "en");
+    }
 }

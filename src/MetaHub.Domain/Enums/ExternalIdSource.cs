@@ -41,5 +41,8 @@ public enum ExternalIdSource
     GoogleBooks = 42,
 
     // Universal bridge
-    Wikidata = 50
+    Wikidata = 50,
+
+    // Artwork-only provider source (not stored as an item external id)
+    FanArtTv = 51
 }

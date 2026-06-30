@@ -52,4 +52,45 @@ public class ServedMetadataTests
             if (File.Exists(dbPath)) File.Delete(dbPath);
         }
     }
+
+    [Fact]
+    public async Task Resolved_work_carries_studios_separately_from_people()
+    {
+        var dbPath = Path.Combine(Path.GetTempPath(), $"metahub-studios-{Guid.NewGuid():N}.db");
+        var sp = new ServiceCollection().AddMetaHubInfrastructureSqlite(dbPath).AddHttpClient().BuildServiceProvider();
+        try
+        {
+            sp.EnsureMetaHubSchemaCreated();
+            using (var scope = sp.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+                var work = new Work { MediaType = MediaType.Anime, CanonicalTitle = "Fate/stay night" };
+                // Studios are stored as Studio-role credits; real people use other roles.
+                work.Credits.Add(new Credit { Role = CreditRole.Studio, Person = new Person { Name = "ufotable" } });
+                work.Credits.Add(new Credit { Role = CreditRole.Director, Person = new Person { Name = "Tomonori Sudou" } });
+                db.Works.Add(work);
+                await db.SaveChangesAsync();
+            }
+
+            var backend = new MetaHubBackend(
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                sp.GetRequiredService<IHttpClientFactory>(),
+                () => new PluginConfiguration { UseEmbeddedEngine = true, EnrichOnDemand = false });
+
+            var dto = await backend.ResolveByNameAsync(
+                new[] { "Fate/stay night" }, null, MediaType.Anime, null, null, CancellationToken.None);
+
+            Assert.NotNull(dto);
+            Assert.Contains("ufotable", dto!.Studios);
+            // A studio is not a person.
+            Assert.DoesNotContain(dto.People, p => p.Name == "ufotable");
+            Assert.Contains(dto.People, p => p.Name == "Tomonori Sudou");
+        }
+        finally
+        {
+            sp.Dispose();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
 }

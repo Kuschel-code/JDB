@@ -70,6 +70,8 @@ public class MetaHubMovieProvider : IRemoteMetadataProvider<Movie, MovieInfo>
         };
         if (work.Genres.Count > 0)
             result.Item.Genres = work.Genres.ToArray();
+        if (work.Studios.Count > 0)
+            result.Item.Studios = work.Studios.ToArray();
         MetaHubMapping.ApplyProviderIds(result.Item, work);
         MetaHubMapping.ApplyPeople(result, work);
         return result;

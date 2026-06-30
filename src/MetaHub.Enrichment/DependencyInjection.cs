@@ -20,6 +20,7 @@ public static class DependencyInjection
         AddResilientClient(services, JikanProvider.HttpClientName);
         AddResilientClient(services, KitsuProvider.HttpClientName);
         AddResilientClient(services, TmdbProvider.HttpClientName);
+        AddResilientClient(services, FanArtTvProvider.HttpClientName);
         AddResilientClient(services, MusicBrainzProvider.HttpClientName);
         AddResilientClient(services, OpenLibraryProvider.HttpClientName);
         AddResilientClient(services, GoogleBooksProvider.HttpClientName);
@@ -31,6 +32,8 @@ public static class DependencyInjection
         services.AddScoped<IMetadataProvider, KitsuProvider>();
         // Movies / series (and complementary anime)
         services.AddScoped<IMetadataProvider, TmdbProvider>();
+        // Artwork (posters/backgrounds/logos) keyed by existing tvdb/tmdb/musicbrainz ids
+        services.AddScoped<IMetadataProvider, FanArtTvProvider>();
         // Music
         services.AddScoped<IMetadataProvider, MusicBrainzProvider>();
         // Books

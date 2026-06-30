@@ -51,6 +51,20 @@ public class MetaHubImageProvider : IRemoteImageProvider
 
         var work = await _backend.ResolveAsync(providerIds, config.PreferredLanguage, cancellationToken)
             .ConfigureAwait(false);
+
+        // Name fallback (RC4): an item with no MetaHub-resolvable id yet (or refreshed before the
+        // metadata pass stamped one) still gets artwork by resolving on its folder/name — the same
+        // way the metadata providers do. ResolveByNameAsync also triggers on-demand enrichment.
+        if (work is null && config.MatchByName && item is Movie or Series)
+        {
+            var folderTitle = MetaHubMapping.FolderTitle(item.Path);
+            var candidates = new[] { item.Name, folderTitle }
+                .Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n!);
+            work = await _backend.ResolveByNameAsync(
+                    candidates, item.ProductionYear, null, folderTitle, config.PreferredLanguage, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         if (work is null || !_gate.IsServed(item, work.MediaType, config))
             return Enumerable.Empty<RemoteImageInfo>();
 
