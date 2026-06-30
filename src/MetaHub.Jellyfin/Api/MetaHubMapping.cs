@@ -123,6 +123,11 @@ public static class MetaHubMapping
         "mal" => "MyAnimeList",
         "kitsu" => "Kitsu",
         "animeplanet" => "AnimePlanet",
+        "anisearch" => "AniSearch",
+        "notify" => "Notify",
+        "livechart" => "LiveChart",
+        "annict" => "Annict",
+        "syobocal" => "Syobocal",
         "musicbrainz" => "MusicBrainzAlbum",
         "isbn" => "Isbn",
         _ => null

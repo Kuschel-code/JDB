@@ -151,4 +151,35 @@ public class MediaProviderParserTests
         Assert.Contains(data.Images, i => i.Type == ImageType.Backdrop && i.Lang == null); // "" -> neutral
         Assert.Contains(data.Images, i => i.Type == ImageType.Logo && i.Url.EndsWith("logo.png") && i.Lang == "en");
     }
+
+    [Fact]
+    public void Shikimori_parses_titles_genres_year_poster_and_keeps_russian_as_translation()
+    {
+        const string json = """
+        {
+          "id": 25537,
+          "name": "Fate/stay night Movie: Heaven's Feel - I. Presage Flower",
+          "japanese": [ "Gekijouban Fate/stay night Heaven's Feel I" ],
+          "kind": "movie", "episodes": 1, "aired_on": "2017-10-14",
+          "description": "Pervyy film [character=1]Shirou[/character] adaptatsii.",
+          "image": { "original": "/system/animes/original/25537.jpg?171" },
+          "genres": [ { "name": "Action", "russian": "Ekshen" }, { "name": "Fantasy", "russian": "Fentezi" } ]
+        }
+        """;
+        var data = new ShikimoriProvider(factory: null!).Parse(json);
+
+        Assert.Equal(ExternalIdSource.Shikimori, data.Source);
+        Assert.Equal("Fate/stay night Movie: Heaven's Feel - I. Presage Flower", data.CanonicalTitle);
+        Assert.Equal("Gekijouban Fate/stay night Heaven's Feel I", data.OriginalTitle);
+        Assert.Equal(2017, data.ReleaseYear);
+        Assert.Equal(1, data.EpisodeCount);
+        Assert.Contains("Action", data.Genres);
+        Assert.Contains("Fantasy", data.Genres);
+        Assert.Contains(data.Images, i => i.Type == ImageType.Poster
+            && i.Url == "https://shikimori.one/system/animes/original/25537.jpg?171");
+        // Russian goes to a translation, never the default overview, and BBCode is stripped.
+        Assert.Null(data.Overview);
+        Assert.Contains("Pervyy film", data.OverviewTranslations["ru"]);
+        Assert.DoesNotContain("[character", data.OverviewTranslations["ru"]);
+    }
 }

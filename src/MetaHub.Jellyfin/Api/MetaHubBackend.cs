@@ -511,6 +511,11 @@ public class MetaHubBackend : IMetaHubBackend
             "mal" => ExternalIdSource.Mal,
             "kitsu" => ExternalIdSource.Kitsu,
             "animeplanet" => ExternalIdSource.AnimePlanet,
+            "anisearch" => ExternalIdSource.AniSearch,
+            "notify" => ExternalIdSource.Notify,
+            "livechart" => ExternalIdSource.LiveChart,
+            "annict" => ExternalIdSource.Annict,
+            "syobocal" => ExternalIdSource.Syobocal,
             "musicbrainz" => ExternalIdSource.MusicBrainz,
             "isbn" => ExternalIdSource.Isbn,
             _ => ExternalIdSource.Unknown

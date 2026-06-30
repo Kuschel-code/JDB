@@ -86,6 +86,16 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>fanart.tv API key (optional): high-quality posters/backgrounds/clear logos. Free at fanart.tv.</summary>
     public string FanArtApiKey { get; set; } = string.Empty;
 
+    // --- Embedded engine: which enrichment sources to use (all on by default) ---
+
+    public bool EnableAniList { get; set; } = true;
+    public bool EnableJikan { get; set; } = true;
+    public bool EnableTmdb { get; set; } = true;
+    public bool EnableKitsu { get; set; } = true;
+    public bool EnableFanArt { get; set; } = true;
+    public bool EnableShikimori { get; set; } = true;
+    public bool EnableAnnict { get; set; } = true;
+
     /// <summary>Annict personal access token (annict.com) for Japanese anime metadata (optional).</summary>
     public string AnnictToken { get; set; } = string.Empty;
 

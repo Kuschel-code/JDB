@@ -19,6 +19,7 @@ public static class DependencyInjection
         AddResilientClient(services, AniListProvider.HttpClientName);
         AddResilientClient(services, JikanProvider.HttpClientName);
         AddResilientClient(services, KitsuProvider.HttpClientName);
+        AddResilientClient(services, ShikimoriProvider.HttpClientName);
         AddResilientClient(services, TmdbProvider.HttpClientName);
         AddResilientClient(services, FanArtTvProvider.HttpClientName);
         AddResilientClient(services, MusicBrainzProvider.HttpClientName);
@@ -30,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<IMetadataProvider, AniListProvider>();
         services.AddScoped<IMetadataProvider, JikanProvider>();
         services.AddScoped<IMetadataProvider, KitsuProvider>();
+        services.AddScoped<IMetadataProvider, ShikimoriProvider>();
         // Movies / series (and complementary anime)
         services.AddScoped<IMetadataProvider, TmdbProvider>();
         // Artwork (posters/backgrounds/logos) keyed by existing tvdb/tmdb/musicbrainz ids

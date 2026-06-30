@@ -38,6 +38,12 @@ public class EnrichmentOptions
     /// <summary>fanart.tv API key for high-quality posters/backgrounds/logos. Empty = provider skipped.</summary>
     public string FanArtApiKey { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Provider source names (<see cref="MetaHub.Domain.Enums.ExternalIdSource"/>) the user has
+    /// turned off; the enrichment service skips these providers entirely. Empty = use all.
+    /// </summary>
+    public HashSet<string> DisabledSources { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Annict personal access token (annict.com) for Japanese anime metadata.</summary>
     public string AnnictToken { get; set; } = string.Empty;
 }
