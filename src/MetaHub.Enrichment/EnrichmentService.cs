@@ -30,8 +30,12 @@ public class EnrichmentService
         JikanEpisodeSync? episodeSync = null)
     {
         _db = db;
-        _providers = providers.OrderBy(p => p.Priority).ToList();
         _options = options.Value;
+        // Honor per-source on/off toggles: drop providers the user disabled.
+        _providers = providers
+            .Where(p => !_options.DisabledSources.Contains(p.Source.ToString()))
+            .OrderBy(p => p.Priority)
+            .ToList();
         _log = log;
         _episodeSync = episodeSync;
     }

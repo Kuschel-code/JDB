@@ -49,6 +49,17 @@ public class MetaHubServiceRegistrator : IPluginServiceRegistrator
             o.PreferredLanguage = c.PreferredLanguage;
             if (Enum.TryParse<EnrichmentWriteMode>(c.WriteMode, true, out var mode))
                 o.WriteMode = mode;
+
+            // Per-source on/off toggles -> disabled set (by ExternalIdSource name; Jikan == "Mal").
+            var disabled = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!c.EnableAniList) disabled.Add("AniList");
+            if (!c.EnableJikan) disabled.Add("Mal");
+            if (!c.EnableTmdb) disabled.Add("Tmdb");
+            if (!c.EnableKitsu) disabled.Add("Kitsu");
+            if (!c.EnableFanArt) disabled.Add("FanArtTv");
+            if (!c.EnableShikimori) disabled.Add("Shikimori");
+            if (!c.EnableAnnict) disabled.Add("Annict");
+            o.DisabledSources = disabled;
         });
 
         services.PostConfigure<AniDbOptions>(o =>

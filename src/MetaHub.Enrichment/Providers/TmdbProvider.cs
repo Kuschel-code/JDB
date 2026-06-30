@@ -45,6 +45,9 @@ public class TmdbProvider : IMetadataProvider
         var kind = isMovieId || work.MediaType == MediaType.Movie ? "movie" : "tv";
         var url = $"https://api.themoviedb.org/3/{kind}/{externalId}" +
                   $"?api_key={_options.TmdbApiKey}&append_to_response=credits";
+        // Request the viewer's language so overview/title come back localized (e.g. German).
+        if (!string.IsNullOrWhiteSpace(_options.PreferredLanguage))
+            url += $"&language={Uri.EscapeDataString(_options.PreferredLanguage)}";
 
         var client = _factory.CreateClient(HttpClientName);
         var response = await client.GetAsync(url, ct);

@@ -17,6 +17,11 @@ public static class ProviderIdMapper
         ("Mal", "mal"),
         ("Kitsu", "kitsu"),
         ("AnimePlanet", "animeplanet"),
+        ("AniSearch", "anisearch"),
+        ("Notify", "notify"),
+        ("LiveChart", "livechart"),
+        ("Annict", "annict"),
+        ("Syobocal", "syobocal"),
         ("MusicBrainzAlbum", "musicbrainz"),
         ("MusicBrainz", "musicbrainz"),
         ("Isbn", "isbn")

@@ -30,6 +30,8 @@ public enum ExternalIdSource
     Annict = 18,
     /// <summary>Syoboi Calendar (cal.syoboi.jp) TID — Japanese TV anime schedule database.</summary>
     Syobocal = 19,
+    /// <summary>Shikimori (shikimori.one) — keyed by the MAL id; provider/cache label only.</summary>
+    Shikimori = 20,
 
     // Music
     MusicBrainz = 30,

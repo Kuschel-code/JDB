@@ -122,6 +122,22 @@
                     </div>
 
                     <div class="mhCard">
+                        <h3>Sources (enrichment)</h3>
+                        <div class="fieldDescription" style="margin-bottom:.8em;">
+                            Turn individual metadata sources on or off. AniList / Jikan / Kitsu / Shikimori are free; TMDB and fanart.tv use the API keys below.
+                        </div>
+                        <div class="mhChecks">
+                            <label class="checkboxContainer"><input id="EnableAniList" type="checkbox" is="emby-checkbox" /><span>AniList</span></label>
+                            <label class="checkboxContainer"><input id="EnableJikan" type="checkbox" is="emby-checkbox" /><span>Jikan (MAL)</span></label>
+                            <label class="checkboxContainer"><input id="EnableTmdb" type="checkbox" is="emby-checkbox" /><span>TMDB</span></label>
+                            <label class="checkboxContainer"><input id="EnableKitsu" type="checkbox" is="emby-checkbox" /><span>Kitsu</span></label>
+                            <label class="checkboxContainer"><input id="EnableFanArt" type="checkbox" is="emby-checkbox" /><span>fanart.tv</span></label>
+                            <label class="checkboxContainer"><input id="EnableShikimori" type="checkbox" is="emby-checkbox" /><span>Shikimori</span></label>
+                            <label class="checkboxContainer"><input id="EnableAnnict" type="checkbox" is="emby-checkbox" /><span>Annict</span></label>
+                        </div>
+                    </div>
+
+                    <div class="mhCard">
                         <h3>Language</h3>
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="PreferredLanguage">Preferred language</label>
@@ -305,7 +321,7 @@
             var pluginId = 'a3f1c2d4-5b6e-47a8-9c0d-1e2f3a4b5c6d';
             var page, config, disabled, overrides, saveTimer;
 
-            var checks = ['UseEmbeddedEngine','EnableMovies','EnableSeries','EnableAnime','EnableMusic','EnableBooks','MatchByName','PreferNameOverIds','EnrichOnDemand','AniDbEnabled'];
+            var checks = ['UseEmbeddedEngine','EnableMovies','EnableSeries','EnableAnime','EnableMusic','EnableBooks','EnableAniList','EnableJikan','EnableTmdb','EnableKitsu','EnableFanArt','EnableShikimori','EnableAnnict','MatchByName','PreferNameOverIds','EnrichOnDemand','AniDbEnabled'];
             var texts = ['ApiBaseUrl','ApiKey','RequestTimeoutSeconds','PreferredLanguage','FallbackLanguage','TitlePreference','WriteMode','TmdbApiKey','GoogleBooksApiKey','FanArtApiKey','AnnictToken','AniDbClientName','AniDbClientVersion','AniDbUsername','AniDbPassword'];
 
             function norm(id) { return (id || '').replace(/-/g, '').toLowerCase(); }
