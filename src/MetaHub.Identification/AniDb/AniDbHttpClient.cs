@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -13,6 +14,9 @@ namespace MetaHub.Identification.AniDb;
 public sealed class AniDbHttpClient
 {
     public const string HttpClientName = "anidb-http";
+
+    // AniDB anime XMLs are typically 50–500 KB; 10 MB is extremely generous.
+    private const int MaxDecompressedBytes = 10 * 1024 * 1024;
 
     private readonly AniDbOptions _options;
     private readonly IHttpClientFactory _httpFactory;
@@ -76,24 +80,49 @@ public sealed class AniDbHttpClient
                   $"&protover=1&aid={aid}";
 
         var client = _httpFactory.CreateClient(HttpClientName);
+        var response = await client.GetAsync(url, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            _log.LogWarning("AniDB HTTP: {StatusCode} for aid {Aid}.", response.StatusCode, aid);
+            return null;
+        }
+
+        // Read response bytes once — never issue a second request.
+        var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+
         try
         {
-            var response = await client.GetAsync(url, ct);
-            if (!response.IsSuccessStatusCode)
-            {
-                _log.LogWarning("AniDB HTTP: {StatusCode} for aid {Aid}.", response.StatusCode, aid);
-                return null;
-            }
-
-            await using var raw = await response.Content.ReadAsStreamAsync(ct);
-            await using var gzip = new GZipStream(raw, CompressionMode.Decompress);
-            using var reader = new StreamReader(gzip);
-            return await reader.ReadToEndAsync(ct);
+            await using var mem = new MemoryStream(bytes);
+            await using var gzip = new GZipStream(mem, CompressionMode.Decompress);
+            using var output = new MemoryStream();
+            await CopyWithLimitAsync(gzip, output, MaxDecompressedBytes, ct);
+            return Encoding.UTF8.GetString(output.GetBuffer(), 0, (int)output.Length);
         }
         catch (InvalidDataException)
         {
-            var response = await client.GetAsync(url, ct);
-            return await response.Content.ReadAsStringAsync(ct);
+            // Not gzip — treat as plain text (some error responses aren't compressed).
+            return Encoding.UTF8.GetString(bytes);
+        }
+        catch (IOException ex) when (ex.InnerException is InvalidDataException)
+        {
+            return Encoding.UTF8.GetString(bytes);
+        }
+    }
+
+    private async Task CopyWithLimitAsync(Stream source, Stream dest, int maxBytes, CancellationToken ct)
+    {
+        var buffer = new byte[8192];
+        long total = 0;
+        int read;
+        while ((read = await source.ReadAsync(buffer, ct)) > 0)
+        {
+            total += read;
+            if (total > maxBytes)
+            {
+                _log.LogWarning("AniDB HTTP: decompressed response exceeds {Max} bytes, aborting.", maxBytes);
+                return;
+            }
+            dest.Write(buffer, 0, read);
         }
     }
 

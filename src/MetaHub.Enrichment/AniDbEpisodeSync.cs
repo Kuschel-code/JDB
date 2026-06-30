@@ -48,7 +48,7 @@ public class AniDbEpisodeSync
 
         var existing = await db.Episodes
             .Where(e => e.SeriesWorkId == work.Id)
-            .ToDictionaryAsync(e => (e.SeasonNumber, e.EpisodeNumber), ct);
+            .ToDictionaryAsync(e => (e.SeasonNumber, e.EpisodeNumber, e.Kind), ct);
 
         var preferJapanese = string.Equals(preferredLanguage, "ja", StringComparison.OrdinalIgnoreCase);
         var count = 0;
@@ -64,7 +64,7 @@ public class AniDbEpisodeSync
                 ? ep.Title
                 : (ep.TitleEn ?? ep.Title);
 
-            var key = (season, number);
+            var key = (season, number, kind);
             if (existing.TryGetValue(key, out var row))
             {
                 row.Title = title ?? row.Title;
