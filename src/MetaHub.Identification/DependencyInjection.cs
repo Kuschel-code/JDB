@@ -16,6 +16,7 @@ public static class DependencyInjection
 
         // One shared session/socket for AniDB (strict rate limits → serialize through it).
         services.AddSingleton<IAniDbClient, AniDbUdpClient>();
+        services.AddSingleton<AniDbHttpClient>();
         services.AddScoped<FileIdentificationService>();
 
         return services;

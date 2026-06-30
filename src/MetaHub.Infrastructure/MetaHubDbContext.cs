@@ -151,9 +151,11 @@ public class MetaHubDbContext : DbContext
         {
             e.ToTable("episodes");
             e.HasKey(x => x.Id);
+            e.Property(x => x.Kind).HasConversion<string>();
             e.HasOne(x => x.Series).WithMany(s => s.Episodes)
                 .HasForeignKey(x => x.SeriesWorkId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => new { x.SeriesWorkId, x.SeasonNumber, x.EpisodeNumber });
+            e.HasIndex(x => x.AniDbEpisodeId);
         });
 
         b.Entity<MusicDetail>(e =>

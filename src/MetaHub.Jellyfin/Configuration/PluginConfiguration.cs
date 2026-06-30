@@ -107,6 +107,15 @@ public class PluginConfiguration : BasePluginConfiguration
     public string AniDbUsername { get; set; } = string.Empty;
     public string AniDbPassword { get; set; } = string.Empty;
 
+    /// <summary>Registered client name for the AniDB HTTP API (may differ from the UDP client).</summary>
+    public string AniDbHttpClientName { get; set; } = "metahub";
+
+    /// <summary>Registered client version for the AniDB HTTP API.</summary>
+    public string AniDbHttpClientVersion { get; set; } = "1";
+
+    /// <summary>Enable AniDB HTTP API enrichment (titles, episodes, characters).</summary>
+    public bool EnableAniDb { get; set; } = true;
+
     // --- Embedded engine: scheduled tasks (intervals are managed by Jellyfin's task UI) ---
 
     /// <summary>Folders scanned for anime files during the identification task.</summary>

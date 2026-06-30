@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using MetaHub.Enrichment.Providers;
+using MetaHub.Identification.AniDb;
 using Polly;
 
 namespace MetaHub.Enrichment;
@@ -26,12 +27,14 @@ public static class DependencyInjection
         AddResilientClient(services, OpenLibraryProvider.HttpClientName);
         AddResilientClient(services, GoogleBooksProvider.HttpClientName, redactUrl: true);
         AddResilientClient(services, AnnictProvider.HttpClientName);
+        AddResilientClient(services, AniDbHttpClient.HttpClientName);
 
         // Anime
         services.AddScoped<IMetadataProvider, AniListProvider>();
         services.AddScoped<IMetadataProvider, JikanProvider>();
         services.AddScoped<IMetadataProvider, KitsuProvider>();
         services.AddScoped<IMetadataProvider, ShikimoriProvider>();
+        services.AddScoped<IMetadataProvider, AniDbHttpProvider>();
         // Movies / series (and complementary anime)
         services.AddScoped<IMetadataProvider, TmdbProvider>();
         // Artwork (posters/backgrounds/logos) keyed by existing tvdb/tmdb/musicbrainz ids
@@ -45,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<IMetadataProvider, AnnictProvider>();
 
         services.AddScoped<JikanEpisodeSync>();
+        services.AddScoped<AniDbEpisodeSync>();
         services.AddScoped<EnrichmentService>();
         services.AddScoped<EnrichmentRunner>();
 

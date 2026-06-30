@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MetaHub.Domain;
 using MetaHub.Domain.Entities;
 using MetaHub.Domain.Enums;
 using MetaHub.Infrastructure;
@@ -21,13 +22,15 @@ public class EnrichmentService
     private readonly ILogger<EnrichmentService> _log;
 
     private readonly JikanEpisodeSync? _episodeSync;
+    private readonly AniDbEpisodeSync? _aniDbEpisodeSync;
 
     public EnrichmentService(
         MetaHubDbContext db,
         IEnumerable<IMetadataProvider> providers,
         IOptions<EnrichmentOptions> options,
         ILogger<EnrichmentService> log,
-        JikanEpisodeSync? episodeSync = null)
+        JikanEpisodeSync? episodeSync = null,
+        AniDbEpisodeSync? aniDbEpisodeSync = null)
     {
         _db = db;
         _options = options.Value;
@@ -38,6 +41,7 @@ public class EnrichmentService
             .ToList();
         _log = log;
         _episodeSync = episodeSync;
+        _aniDbEpisodeSync = aniDbEpisodeSync;
     }
 
     public async Task<EnrichmentResult> EnrichAsync(
@@ -109,6 +113,8 @@ public class EnrichmentService
             await new WorkMerger(_db).ApplyAsync(
                 work, collected, writeMode ?? _options.WriteMode, _options.PreferredLanguage, ct);
 
+        ExtendSearchTitles(work);
+
         // Persist the merged fields AND any fetched raw payloads / fetch-log updates — even when every
         // parse failed — so a successful fetch is cached and not re-requested (and re-rate-limited).
         await _db.SaveChangesAsync(ct);
@@ -119,31 +125,67 @@ public class EnrichmentService
     }
 
     /// <summary>
-    /// Best-effort: fill the episode table for anime via Jikan when episodes are missing
+    /// Best-effort: fill the episode table for anime via Jikan / AniDB when episodes are missing
     /// (or stale relative to the known episode count). Failures never break enrichment.
     /// </summary>
     private async Task SyncEpisodesIfMissingAsync(Work work, bool force, CancellationToken ct)
     {
-        if (_episodeSync is null || work.MediaType != MediaType.Anime)
+        if (work.MediaType != MediaType.Anime)
             return;
 
-        var malId = work.ExternalIds.FirstOrDefault(x => x.Source == ExternalIdSource.Mal)?.ExternalValue;
-        if (string.IsNullOrWhiteSpace(malId))
+        var have = await _db.Episodes.CountAsync(e => e.SeriesWorkId == work.Id, ct);
+        var expected = work.SeriesDetail?.EpisodeCount ?? 0;
+        if (!force && have > 0 && (expected == 0 || have >= expected))
             return;
 
-        try
+        if (_episodeSync is not null)
         {
-            var have = await _db.Episodes.CountAsync(e => e.SeriesWorkId == work.Id, ct);
-            var expected = work.SeriesDetail?.EpisodeCount ?? 0;
-            if (!force && have > 0 && (expected == 0 || have >= expected))
-                return;
+            var malId = work.ExternalIds.FirstOrDefault(x => x.Source == ExternalIdSource.Mal)?.ExternalValue;
+            if (!string.IsNullOrWhiteSpace(malId))
+            {
+                try { await _episodeSync.SyncAsync(_db, work, malId, _options.PreferredLanguage, ct); }
+                catch (Exception ex) { _log.LogWarning(ex, "Jikan episode sync failed for work {WorkId}", work.Id); }
+            }
+        }
 
-            await _episodeSync.SyncAsync(_db, work, malId!, _options.PreferredLanguage, ct);
-        }
-        catch (Exception ex)
+        if (_aniDbEpisodeSync is not null)
         {
-            _log.LogWarning(ex, "Episode sync failed for work {WorkId}", work.Id);
+            var aidValue = work.ExternalIds.FirstOrDefault(x => x.Source == ExternalIdSource.AniDb)?.ExternalValue;
+            if (!string.IsNullOrWhiteSpace(aidValue))
+            {
+                try { await _aniDbEpisodeSync.SyncAsync(_db, work, aidValue, _options.PreferredLanguage, ct); }
+                catch (Exception ex) { _log.LogWarning(ex, "AniDB episode sync failed for work {WorkId}", work.Id); }
+            }
         }
+    }
+
+    /// <summary>
+    /// Extends <see cref="Work.SearchTitles"/> with any new titles discovered during enrichment
+    /// (canonical title, original title, all locale translations). Additive-only: existing
+    /// ingest-time synonyms are preserved.
+    /// </summary>
+    private static void ExtendSearchTitles(Work work)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        if (!string.IsNullOrEmpty(work.SearchTitles))
+            foreach (var t in work.SearchTitles.Split('|', StringSplitOptions.RemoveEmptyEntries))
+                seen.Add(t);
+
+        var before = seen.Count;
+
+        void TryAdd(string? raw)
+        {
+            var norm = TitleNormalization.Normalize(raw);
+            if (norm.Length > 0) seen.Add(norm);
+        }
+
+        TryAdd(work.CanonicalTitle);
+        TryAdd(work.OriginalTitle);
+        foreach (var v in work.TitleTranslations.Values)
+            TryAdd(v);
+
+        if (seen.Count > before)
+            work.SearchTitles = "|" + string.Join("|", seen) + "|";
     }
 
     private async Task<string?> GetCachedBodyAsync(Guid workId, ExternalIdSource source, TimeSpan ttl, CancellationToken ct)
