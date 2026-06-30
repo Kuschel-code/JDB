@@ -20,11 +20,11 @@ public static class DependencyInjection
         AddResilientClient(services, JikanProvider.HttpClientName);
         AddResilientClient(services, KitsuProvider.HttpClientName);
         AddResilientClient(services, ShikimoriProvider.HttpClientName);
-        AddResilientClient(services, TmdbProvider.HttpClientName);
-        AddResilientClient(services, FanArtTvProvider.HttpClientName);
+        AddResilientClient(services, TmdbProvider.HttpClientName, redactUrl: true);
+        AddResilientClient(services, FanArtTvProvider.HttpClientName, redactUrl: true);
         AddResilientClient(services, MusicBrainzProvider.HttpClientName);
         AddResilientClient(services, OpenLibraryProvider.HttpClientName);
-        AddResilientClient(services, GoogleBooksProvider.HttpClientName);
+        AddResilientClient(services, GoogleBooksProvider.HttpClientName, redactUrl: true);
         AddResilientClient(services, AnnictProvider.HttpClientName);
 
         // Anime
@@ -51,9 +51,9 @@ public static class DependencyInjection
         return services;
     }
 
-    private static void AddResilientClient(IServiceCollection services, string name)
+    private static void AddResilientClient(IServiceCollection services, string name, bool redactUrl = false)
     {
-        services.AddHttpClient(name, (sp, client) =>
+        var clientBuilder = services.AddHttpClient(name, (sp, client) =>
             {
                 var options = sp.GetRequiredService<IOptions<EnrichmentOptions>>().Value;
                 client.Timeout = TimeSpan.FromSeconds(30);
@@ -63,5 +63,11 @@ public static class DependencyInjection
             .AddTransientHttpErrorPolicy(builder => builder
                 .OrResult(r => r.StatusCode == HttpStatusCode.TooManyRequests)
                 .WaitAndRetryAsync(4, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))));
+
+        // TMDB / fanart.tv / Google Books carry the API key in the query string; the default
+        // IHttpClientFactory logger logs the request URI at Information, which would leak the key
+        // into Jellyfin's log. Drop the request loggers for those clients.
+        if (redactUrl)
+            clientBuilder.RemoveAllLoggers();
     }
 }
