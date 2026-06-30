@@ -7,9 +7,10 @@ namespace MetaHub.Identification.AniDb;
 
 /// <summary>
 /// Minimal AniDB UDP API client for file identification. Implements AUTH, the FILE command
-/// (lookup by size + ED2K), and LOGOUT, with conservative rate limiting and a single
-/// reusable session. Designed to be used defensively: one request at a time, results cached
-/// by the caller, never queried twice for the same file.
+/// (lookup by size + ED2K), and LOGOUT, with conservative rate limiting and a single reusable
+/// session. Used defensively: one request at a time, results cached by the caller, never
+/// queried twice for the same file. An expired/invalid session is transparently recovered, and
+/// a ban (555) triggers a back-off so the client never keeps hammering a banned endpoint.
 /// </summary>
 public sealed class AniDbUdpClient : IAniDbClient, IDisposable
 {
@@ -25,6 +26,7 @@ public sealed class AniDbUdpClient : IAniDbClient, IDisposable
     private UdpClient? _udp;
     private string? _session;
     private DateTimeOffset _lastRequest = DateTimeOffset.MinValue;
+    private DateTimeOffset _bannedUntil = DateTimeOffset.MinValue;
 
     public AniDbUdpClient(IOptions<AniDbOptions> options, ILogger<AniDbUdpClient> log)
     {
@@ -42,24 +44,51 @@ public sealed class AniDbUdpClient : IAniDbClient, IDisposable
         await _gate.WaitAsync(ct);
         try
         {
-            await EnsureAuthenticatedAsync(ct);
-
-            var command = $"FILE size={sizeBytes}&ed2k={ed2kHash}&fmask={FMask}&amask={AMask}&s={_session}";
-            var response = await SendAsync(command, ct);
-
-            // 220 = FILE found, 320 = no such file.
-            if (response.StartsWith("320"))
+            if (DateTimeOffset.UtcNow < _bannedUntil)
             {
-                _log.LogInformation("AniDB: no file for ed2k {Ed2k} size {Size}", ed2kHash, sizeBytes);
-                return null;
-            }
-            if (!response.StartsWith("220"))
-            {
-                _log.LogWarning("AniDB FILE unexpected response: {Response}", FirstLine(response));
+                _log.LogWarning("AniDB: skipping lookup — client is banned until {Until:u}.", _bannedUntil);
                 return null;
             }
 
-            return ParseFileResponse(response);
+            for (var attempt = 0; attempt < 2; attempt++)
+            {
+                await EnsureAuthenticatedAsync(ct);
+
+                var command = $"FILE size={sizeBytes}&ed2k={ed2kHash}&fmask={FMask}&amask={AMask}&s={_session}";
+                var response = await SendAsync(command, ct);
+
+                switch (ResponseCode(response))
+                {
+                    case 220:
+                        return ParseFileResponse(response);
+
+                    case 320:
+                        _log.LogInformation("AniDB: no file for ed2k {Ed2k} size {Size}", ed2kHash, sizeBytes);
+                        return null;
+
+                    case 501:
+                    case 502:
+                    case 506:
+                        _log.LogInformation("AniDB: session invalid (code {Code}); re-authenticating.",
+                            ResponseCode(response));
+                        _session = null;
+                        continue;
+
+                    case 555:
+                        _bannedUntil = DateTimeOffset.UtcNow.Add(_options.BanBackoff);
+                        _session = null;
+                        _log.LogError("AniDB: BANNED — backing off until {Until:u}. Response: {Response}",
+                            _bannedUntil, FirstLine(response));
+                        return null;
+
+                    default:
+                        _log.LogWarning("AniDB FILE unexpected response: {Response}", FirstLine(response));
+                        return null;
+                }
+            }
+
+            _log.LogWarning("AniDB: lookup still failed after re-authentication for ed2k {Ed2k}.", ed2kHash);
+            return null;
         }
         finally
         {
@@ -82,9 +111,9 @@ public sealed class AniDbUdpClient : IAniDbClient, IDisposable
             $"&protover=3&client={_options.ClientName}&clientver={_options.ClientVersion}&enc=UTF8";
 
         var response = await SendAsync(command, ct);
+        var code = ResponseCode(response);
 
-        // 200/201 LOGIN ACCEPTED — session key is the first token after the code.
-        if (response.StartsWith("200") || response.StartsWith("201"))
+        if (code is 200 or 201)
         {
             var parts = FirstLine(response).Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length >= 2)
@@ -93,6 +122,12 @@ public sealed class AniDbUdpClient : IAniDbClient, IDisposable
                 _log.LogInformation("AniDB: authenticated");
                 return;
             }
+        }
+
+        if (code == 555)
+        {
+            _bannedUntil = DateTimeOffset.UtcNow.Add(_options.BanBackoff);
+            _log.LogError("AniDB: BANNED during AUTH — backing off until {Until:u}.", _bannedUntil);
         }
 
         throw new InvalidOperationException($"AniDB AUTH failed: {FirstLine(response)}");
@@ -140,6 +175,12 @@ public sealed class AniDbUdpClient : IAniDbClient, IDisposable
             EpisodeNumber = At(6),
             RawResponse = dataLine
         };
+    }
+
+    private static int ResponseCode(string response)
+    {
+        var line = FirstLine(response);
+        return line.Length >= 3 && int.TryParse(line.AsSpan(0, 3), out var code) ? code : -1;
     }
 
     private static string FirstLine(string s) => s.Split('\n', 2)[0].Trim();

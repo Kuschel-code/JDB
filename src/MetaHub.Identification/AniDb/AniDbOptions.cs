@@ -32,4 +32,7 @@ public class AniDbOptions
 
     /// <summary>How long to wait for a UDP reply before giving up.</summary>
     public int ReceiveTimeoutSeconds { get; set; } = 20;
+
+    /// <summary>How long after 555 BANNED no requests are sent. Bans escalate, so be generous.</summary>
+    public TimeSpan BanBackoff { get; set; } = TimeSpan.FromMinutes(30);
 }

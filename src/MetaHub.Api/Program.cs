@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MetaHub.Api.Endpoints;
 using MetaHub.Api.Scheduling;
+using MetaHub.Api.Security;
 using MetaHub.Enrichment;
 using MetaHub.Export;
 using MetaHub.Identification;
@@ -44,6 +45,14 @@ if (app.Configuration.GetValue("MetaHub:AutoMigrate", true))
 }
 
 app.UseSerilogRequestLogging();
+
+app.UseMiddleware<ApiKeyMiddleware>();
+if (string.IsNullOrWhiteSpace(app.Configuration["MetaHub:ApiKey"]))
+    app.Logger.LogWarning(
+        "MetaHub API läuft OHNE Authentifizierung (MetaHub:ApiKey nicht gesetzt). " +
+        "Admin-Endpunkte (Ingest/Enrich/NFO-Export, Datei-Identify mit beliebigem Pfad) sind " +
+        "öffentlich erreichbar. Setze MetaHub:ApiKey und binde auf localhost, falls die Instanz " +
+        "im Netz erreichbar ist.");
 
 app.UseSwagger();
 app.UseSwaggerUI();
