@@ -59,6 +59,7 @@ public class MetaHubServiceRegistrator : IPluginServiceRegistrator
             if (!c.EnableFanArt) disabled.Add("FanArtTv");
             if (!c.EnableShikimori) disabled.Add("Shikimori");
             if (!c.EnableAnnict) disabled.Add("Annict");
+            if (!c.EnableAniDb) disabled.Add("AniDb");
             o.DisabledSources = disabled;
         });
 
@@ -71,6 +72,8 @@ public class MetaHubServiceRegistrator : IPluginServiceRegistrator
             o.ClientVersion = c.AniDbClientVersion;
             o.Username = c.AniDbUsername;
             o.Password = c.AniDbPassword;
+            o.HttpClientName = c.AniDbHttpClientName;
+            o.HttpClientVersion = c.AniDbHttpClientVersion;
         });
 
         // Per-item enable/disable gate (resolves library ancestry; ILibraryManager is host-provided).

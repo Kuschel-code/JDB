@@ -5,7 +5,8 @@ namespace MetaHub.Identification.Hashing;
 ///
 /// Algorithm: split the file into 9,728,000-byte chunks, MD4 each chunk, then MD4 the
 /// concatenation of the chunk hashes. A file that fits in a single chunk hashes to the
-/// MD4 of its bytes directly.
+/// MD4 of its bytes directly. A file whose size is an exact multiple of the chunk size
+/// additionally hashes an empty trailing chunk (AniDB "red" variant).
 /// </summary>
 public static class Ed2kHasher
 {
@@ -19,20 +20,30 @@ public static class Ed2kHasher
     {
         var chunkHashes = new List<byte[]>();
         var buffer = new byte[ChunkSize];
+        bool endedOnChunkBoundary = false;
 
         while (true)
         {
             int read = await ReadFullChunkAsync(stream, buffer, ct);
             if (read == 0 && chunkHashes.Count > 0)
-                break; // whole file already consumed on a chunk boundary
+            {
+                endedOnChunkBoundary = true;
+                break;
+            }
 
             chunkHashes.Add(Md4.Hash(buffer.AsSpan(0, read)));
 
             if (read < ChunkSize)
-                break; // last (partial) chunk
+                break;
         }
 
-        // Single chunk → the ED2K hash is just that chunk's MD4 (also covers the empty file).
+        // AniDB "red" variant: a file that ends exactly on a chunk boundary gets one extra
+        // MD4-of-empty chunk appended before the final hash. This matches AniDB's canonical
+        // <ed2k>; omitting it (the "blue" variant) only matches the secondary <ed2k_alt> and so
+        // fails the primary FILE lookup. (Verified against the published 0x55*ChunkSize vector.)
+        if (endedOnChunkBoundary)
+            chunkHashes.Add(Md4.Hash(ReadOnlySpan<byte>.Empty));
+
         byte[] digest = chunkHashes.Count == 1
             ? chunkHashes[0]
             : Md4.Hash(Concat(chunkHashes));

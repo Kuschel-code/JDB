@@ -60,17 +60,31 @@ public class HashingTests
     }
 
     [Fact]
-    public async Task Ed2k_exact_multiple_uses_the_no_trailing_empty_chunk_variant()
+    public async Task Ed2k_exact_one_chunk_matches_published_AniDB_red_vector()
     {
-        // A file of exactly N*ChunkSize has two ED2K conventions; this impl uses the eMule variant
-        // (no trailing empty chunk). Pin that so a regression is caught.
+        // External, independently published vector (github.com/Kimundi/ed2k): exactly one
+        // 9,728,000-byte chunk of 0x55. AniDB's canonical hash is the "red" variant (extra empty
+        // trailing chunk). This pins correctness against a third-party reference, not our own MD4.
+        var data = new byte[Ed2kHasher.ChunkSize];
+        Array.Fill(data, (byte)0x55);
+        using var stream = new MemoryStream(data);
+
+        Assert.Equal("49e80f377b7e4e706dbd3ecc89f39306", await Ed2kHasher.ComputeAsync(stream));
+        Assert.NotEqual("4127a47867b6110f0f86f2d9845fb374", await Ed2kHasher.ComputeAsync(new MemoryStream(data)));
+    }
+
+    [Fact]
+    public async Task Ed2k_exact_two_chunks_appends_empty_trailing_chunk()
+    {
         const int chunk = Ed2kHasher.ChunkSize;
         var data = new byte[2 * chunk];
         for (var i = 0; i < data.Length; i++) data[i] = (byte)(i & 0xFF);
 
-        var concat = new byte[32];
+        // red = MD4( MD4(c0) || MD4(c1) || MD4(empty) )
+        var concat = new byte[48];
         Md4.Hash(data.AsSpan(0, chunk)).CopyTo(concat.AsSpan(0));
         Md4.Hash(data.AsSpan(chunk, chunk)).CopyTo(concat.AsSpan(16));
+        Md4.Hash(ReadOnlySpan<byte>.Empty).CopyTo(concat.AsSpan(32));
         var expected = Convert.ToHexString(Md4.Hash(concat)).ToLowerInvariant();
 
         using var stream = new MemoryStream(data);
