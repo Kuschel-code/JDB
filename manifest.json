@@ -9,6 +9,22 @@
     "imageUrl": "https://raw.githubusercontent.com/Kuschel-code/JDB/main/assets/logo.png",
     "versions": [
       {
+        "version": "0.1.9.3",
+        "changelog": "Release v0.1.9.3",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/Kuschel-code/JDB/releases/download/v0.1.9.3/metahub-jellyfin-plugin-v0.1.9.3.zip",
+        "checksum": "b7f148089a78bc05ba8f26f99330284d",
+        "timestamp": "2026-07-01T21:49:49Z"
+      },
+      {
+        "version": "0.1.9.2",
+        "changelog": "Release v0.1.9.2",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/Kuschel-code/JDB/releases/download/v0.1.9.2/metahub-jellyfin-plugin-v0.1.9.2.zip",
+        "checksum": "5beb8eef4ddd5f2bfd8781b9a9490373",
+        "timestamp": "2026-06-30T22:22:59Z"
+      },
+      {
         "version": "0.1.9.1",
         "changelog": "Release v0.1.9.1",
         "targetAbi": "10.11.0.0",
