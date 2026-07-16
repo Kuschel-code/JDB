@@ -16,11 +16,13 @@ public class AniDbHttpTests
           <type>TV Series</type>
           <episodecount>26</episodecount>
           <startdate>1998-04-03</startdate>
+          <enddate>1999-04-24</enddate>
           <titles>
             <title xml:lang="x-jat" type="main">Cowboy Bebop</title>
             <title xml:lang="en" type="official">Cowboy Bebop</title>
             <title xml:lang="ja" type="official">カウボーイビバップ</title>
             <title xml:lang="de" type="synonym">Cowboy Bebop - Deutsch</title>
+            <title xml:lang="de" type="official">Cowboy Bebop DE</title>
           </titles>
           <description>In the year 2071, bounty hunters roam the solar system.</description>
           <picture>12345.jpg</picture>
@@ -84,6 +86,7 @@ public class AniDbHttpTests
         Assert.Equal("TV Series", anime.Type);
         Assert.Equal(26, anime.EpisodeCount);
         Assert.Equal("1998-04-03", anime.StartDate);
+        Assert.Equal("1999-04-24", anime.EndDate);
         Assert.Equal(8.42, anime.Rating);
         Assert.Contains("In the year 2071", anime.Description!);
         Assert.Equal("https://cdn.anidb.net/images/main/12345.jpg", anime.PictureUrl);
@@ -94,10 +97,11 @@ public class AniDbHttpTests
     {
         var anime = AniDbAnimeParser.Parse(SampleAnimeXml);
 
-        Assert.Equal(4, anime.Titles.Count);
+        Assert.Equal(5, anime.Titles.Count);
         Assert.Contains(anime.Titles, t => t.Lang == "x-jat" && t.Type == "main" && t.Text == "Cowboy Bebop");
         Assert.Contains(anime.Titles, t => t.Lang == "ja" && t.Type == "official" && t.Text == "カウボーイビバップ");
         Assert.Contains(anime.Titles, t => t.Lang == "de" && t.Type == "synonym");
+        Assert.Contains(anime.Titles, t => t.Lang == "de" && t.Type == "official");
     }
 
     [Fact]
@@ -221,7 +225,51 @@ public class AniDbHttpTests
         Assert.Equal("Cowboy Bebop", data.TitleTranslations["x-jat"]);
         Assert.Equal("Cowboy Bebop", data.TitleTranslations["en"]);
         Assert.Equal("カウボーイビバップ", data.TitleTranslations["ja"]);
-        Assert.Equal("Cowboy Bebop - Deutsch", data.TitleTranslations["de"]);
+        // The de official title wins over the de synonym even though the synonym comes first.
+        Assert.Equal("Cowboy Bebop DE", data.TitleTranslations["de"]);
+    }
+
+    [Fact]
+    public void Provider_parse_derives_finished_status_from_past_end_date()
+    {
+        var anime = AniDbAnimeParser.Parse(SampleAnimeXml);
+        var json = JsonSerializer.Serialize(anime);
+
+        var data = new AniDbHttpProvider(client: null!).Parse(json);
+
+        Assert.Equal(WorkStatus.Finished, data.Status);
+    }
+
+    [Fact]
+    public void Provider_parse_derives_ongoing_status_when_started_without_end_date()
+    {
+        const string xml = """
+            <anime id="99">
+              <titles><title xml:lang="x-jat" type="main">Endless Show</title></titles>
+              <startdate>2000-01-01</startdate>
+            </anime>
+            """;
+        var json = JsonSerializer.Serialize(AniDbAnimeParser.Parse(xml));
+
+        var data = new AniDbHttpProvider(client: null!).Parse(json);
+
+        Assert.Equal(WorkStatus.Ongoing, data.Status);
+    }
+
+    [Fact]
+    public void Provider_parse_leaves_status_unset_for_partial_dates()
+    {
+        const string xml = """
+            <anime id="99">
+              <titles><title xml:lang="x-jat" type="main">Vague Show</title></titles>
+              <startdate>1998</startdate>
+            </anime>
+            """;
+        var json = JsonSerializer.Serialize(AniDbAnimeParser.Parse(xml));
+
+        var data = new AniDbHttpProvider(client: null!).Parse(json);
+
+        Assert.Null(data.Status);
     }
 
     [Fact]
