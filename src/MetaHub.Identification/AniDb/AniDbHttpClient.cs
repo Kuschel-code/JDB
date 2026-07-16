@@ -95,7 +95,8 @@ public sealed class AniDbHttpClient
             await using var mem = new MemoryStream(bytes);
             await using var gzip = new GZipStream(mem, CompressionMode.Decompress);
             using var output = new MemoryStream();
-            await CopyWithLimitAsync(gzip, output, MaxDecompressedBytes, ct);
+            if (!await CopyWithLimitAsync(gzip, output, MaxDecompressedBytes, ct))
+                return null; // over the cap — a truncated document must not reach the parser/cache
             return Encoding.UTF8.GetString(output.GetBuffer(), 0, (int)output.Length);
         }
         catch (InvalidDataException)
@@ -109,7 +110,8 @@ public sealed class AniDbHttpClient
         }
     }
 
-    private async Task CopyWithLimitAsync(Stream source, Stream dest, int maxBytes, CancellationToken ct)
+    /// <summary>Copies until EOF or the cap; returns false when the cap was exceeded.</summary>
+    private async Task<bool> CopyWithLimitAsync(Stream source, Stream dest, int maxBytes, CancellationToken ct)
     {
         var buffer = new byte[8192];
         long total = 0;
@@ -120,10 +122,11 @@ public sealed class AniDbHttpClient
             if (total > maxBytes)
             {
                 _log.LogWarning("AniDB HTTP: decompressed response exceeds {Max} bytes, aborting.", maxBytes);
-                return;
+                return false;
             }
             dest.Write(buffer, 0, read);
         }
+        return true;
     }
 
     private void HandleError(string error)
