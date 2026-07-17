@@ -46,12 +46,18 @@ ingest/enrichment exposed as Jellyfin **Scheduled Tasks**. Datasets come from Gi
    ```
 
 2. **Install** from Catalog → Metadata → **MetaHub**, then restart Jellyfin.
-3. **Configure** under Plugins → MetaHub (**Mode / Library / Engine / About**) — keep
-   *embedded* on; optionally add a TMDB key and AniDB credentials.
+3. **Configure** under Plugins → MetaHub (**Mode / Library / Engine / Sources / About**) —
+   keep *embedded* on. Optional: add a TMDB key (movies/series), a fanart.tv key
+   (extra artwork), an Annict token, and AniDB credentials (exact file identification
+   plus rich anime metadata). Every source can be toggled individually.
 4. **Run the tasks** (Dashboard → Scheduled Tasks): **MetaHub: Update anime mappings**
    once, then **MetaHub: Enrich metadata**.
 
 That's it — Jellyfin now pulls metadata and artwork from your local MetaHub.
+
+The embedded database is a **rebuildable cache**: on plugin updates that change the
+schema it is wiped and rebuilt automatically from the datasets and provider caches —
+no manual migration steps.
 
 ## Get started — standalone server (optional)
 
@@ -64,9 +70,13 @@ Jellyfin plugin becomes a thin client (turn *embedded* off and point it at the A
 ### Docker (PostgreSQL + API)
 
 ```bash
+export METAHUB_API_KEY="choose-a-long-random-string"
 docker compose up --build
-# API on http://localhost:8080  (Swagger UI at /swagger)
+# API on http://127.0.0.1:8080  (Swagger UI at /swagger)
 ```
+
+Both published ports bind to `127.0.0.1` by default — put a reverse proxy (with TLS)
+in front if you need remote access.
 
 ### From source
 
@@ -76,7 +86,18 @@ dotnet run --project src/MetaHub.Api    # needs a PostgreSQL (or: docker compose
 
 The connection string is read from `ConnectionStrings:MetaHub` (or `METAHUB_CONNECTION`).
 Migrations are applied on startup unless `MetaHub:AutoMigrate` is `false`. Trigger an
-ingest with `curl -X POST http://localhost:8080/api/admin/ingest/anime`.
+ingest with:
+
+```bash
+curl -X POST -H "X-Api-Key: $METAHUB_API_KEY" http://127.0.0.1:8080/api/admin/ingest/anime
+```
+
+### API authentication
+
+When `MetaHub:ApiKey` (env: `MetaHub__ApiKey`) is set, **every `/api` route requires the
+`X-Api-Key` header** (constant-time comparison); `/health` stays open for probes. Without
+a key the API is open and a loud warning is logged at startup — fine on a trusted LAN,
+not fine anywhere else.
 
 ---
 
@@ -88,6 +109,16 @@ Mappings    ─► [1] Ingest         ─► master data + cross-IDs   (SQLite e
 External    ─► [2] Enrichment     ─► normalized fields + artwork (rate-limited, cached, Polly)
 APIs        ─► [3] Delivery       ─► Jellyfin plugin (in-process) · Web API · NFO export
 ```
+
+**Enrichment sources:** AniList · Jikan (MAL) · Kitsu · Shikimori · Annict ·
+**AniDB HTTP** (titles, episodes incl. specials, characters/seiyuu, artwork) ·
+TMDB · fanart.tv · MusicBrainz · Open Library · Google Books.
+Each provider is cached with a TTL, rate-limited, and individually switchable; results
+are merged per-field by source priority.
+
+**AniDB** is used twice, with separate clients and separate rate limits: the **UDP API**
+identifies local files exactly by ED2K hash (Shoko-style), the **HTTP API** supplies the
+anime metadata. Both are ban-aware (automatic backoff) and never fetch uncached in a loop.
 
 ## Tech stack
 
@@ -106,12 +137,12 @@ APIs        ─► [3] Delivery       ─► Jellyfin plugin (in-process) · Web
 ```
 src/
   MetaHub.Domain          Entities + enums (the unified data model)
-  MetaHub.Infrastructure  EF Core DbContext (provider-agnostic: SQLite or PostgreSQL)
+  MetaHub.Infrastructure  EF Core DbContext + migrations (SQLite or PostgreSQL)
   MetaHub.Ingest          Anime ingest (manami + Fribb) with Polly-backed HTTP
-  MetaHub.Identification  Shoko core: ED2K/MD4/CRC32 hashing + AniDB UDP client + name parser
-  MetaHub.Enrichment      Providers (AniList/Jikan/TMDB/MusicBrainz/OpenLibrary/GoogleBooks) + merger
+  MetaHub.Identification  Shoko core: ED2K/MD4/CRC32 hashing, AniDB UDP + HTTP clients, name parser
+  MetaHub.Enrichment      Providers (see list above), per-field merger, episode sync (Jikan + AniDB)
   MetaHub.Export          NFO export (Jellyfin/Kodi-compatible *.nfo)
-  MetaHub.Api             ASP.NET Core Minimal API (standalone server mode)
+  MetaHub.Api             ASP.NET Core Minimal API (standalone server mode, X-Api-Key gate)
   MetaHub.Jellyfin        Jellyfin plugin: embedded engine, providers, scheduled tasks, settings UI
 tests/
   MetaHub.Tests           Unit + SQLite integration tests
@@ -132,15 +163,20 @@ Highlights:
 
 - **Enrichment write mode** — `FillMissingOnly` (default, never touches existing metadata)
   or `Overwrite`. Genres and images are always additive.
-- **AniDB** — disabled by default; needs a registered UDP client + account.
+- **Per-source toggles** — every provider can be switched off individually.
+- **AniDB** — disabled by default; needs a registered client (UDP for file
+  identification, HTTP for anime metadata) and an account. Conservative rate limits and
+  ban backoff are built in.
 - **Scheduling** — embedded mode uses Jellyfin Scheduled Tasks; server mode has a built-in
   background scheduler (`Scheduler` section).
 
 ## API endpoints (server mode)
 
+All `/api` routes require the `X-Api-Key` header when `MetaHub:ApiKey` is configured.
+
 | Method | Route                                  | Purpose                                   |
 |--------|----------------------------------------|-------------------------------------------|
-| GET    | `/health`                              | Liveness                                  |
+| GET    | `/health`                              | Liveness (always open)                    |
 | GET    | `/api/work/{id}?lang=de`               | Canonical record (localized overview)     |
 | GET    | `/api/work/{id}/images?type=poster`    | Artwork for a work                        |
 | GET    | `/api/series/{id}/episodes`            | Episodes of a series/anime                |
@@ -167,6 +203,9 @@ Highlights:
 - [x] **M7** Jellyfin metadata/image provider plugin
 - [x] **M8** Conflict resolution (priority + write modes), image scoring, i18n (`?lang=`), Serilog + stats
 - [x] **Embedded mode** — full engine inside Jellyfin (SQLite), no Docker/server
+- [x] **AniDB HTTP metadata (P1)** — titles, episodes (incl. specials/credits), characters/seiyuu, artwork
+- [ ] **anime-lists ingest (P2)** — richer AniDB ↔ TVDB/TMDB cross-mapping
+- [ ] **Season/episode remapping (P3)** — map AniDB absolute numbering onto TVDB-style S/E
 
 ## Development
 
@@ -179,7 +218,8 @@ dotnet test       # unit + SQLite integration tests
 from the UI — **Actions → Release → Run workflow**, enter the version. The workflow creates the
 tag + GitHub Release, builds the runtime zips and the Jellyfin plugin zip, and updates
 [`manifest.json`](manifest.json) (with the plugin zip's MD5) so the plugin repository link
-serves the new version automatically.
+serves the new version automatically. `manifest.json` is owned by that workflow — don't
+edit it by hand.
 
 ## Legal
 
