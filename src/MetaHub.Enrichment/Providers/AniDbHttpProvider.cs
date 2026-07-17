@@ -59,7 +59,7 @@ public class AniDbHttpProvider : IMetadataProvider
                      .Where(t => !string.IsNullOrWhiteSpace(t.Text) && !string.IsNullOrWhiteSpace(t.Lang))
                      .GroupBy(t => t.Lang!))
         {
-            data.TitleTranslations[group.Key] = group.OrderBy(t => TitleTypeRank(t.Type)).First().Text;
+            data.TitleTranslations[group.Key] = group.MinBy(t => TitleTypeRank(t.Type))!.Text;
         }
 
         foreach (var tag in anime.Tags)
@@ -103,17 +103,26 @@ public class AniDbHttpProvider : IMetadataProvider
 
     /// <summary>
     /// Derives the work status from AniDB's air dates (there is no explicit status field).
-    /// Partial dates ("1998", "1998-04") are ignored rather than guessed.
+    /// Deliberately conservative: only date constellations that are unambiguous evidence
+    /// produce a value. "Started with no end date" stays null — AniDB omits the end date
+    /// for some finished works and for cancelled/on-hiatus ones, so guessing Ongoing there
+    /// would override an explicit status from another provider with a wrong one. Partial
+    /// dates ("1998", "1998-04") never count as evidence.
     /// </summary>
     private static WorkStatus? DeriveStatus(string? startDate, string? endDate)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var hasStart = DateOnly.TryParseExact(startDate, "yyyy-MM-dd", out var start);
+        var hasEnd = DateOnly.TryParseExact(endDate, "yyyy-MM-dd", out var end);
 
-        if (DateOnly.TryParseExact(endDate, "yyyy-MM-dd", out var end))
-            return end <= today ? WorkStatus.Finished : WorkStatus.Ongoing;
+        if (hasStart && start > today)
+            return WorkStatus.Announced;
 
-        if (DateOnly.TryParseExact(startDate, "yyyy-MM-dd", out var start))
-            return start > today ? WorkStatus.Announced : WorkStatus.Ongoing;
+        if (hasEnd && end < today)
+            return WorkStatus.Finished;
+
+        if (hasStart && hasEnd) // started, scheduled end still ahead
+            return WorkStatus.Ongoing;
 
         return null;
     }

@@ -241,12 +241,51 @@ public class AniDbHttpTests
     }
 
     [Fact]
-    public void Provider_parse_derives_ongoing_status_when_started_without_end_date()
+    public void Provider_parse_leaves_status_unset_when_started_without_end_date()
     {
+        // "Started, no end date" is NOT evidence of airing: AniDB omits the end date for
+        // some finished works and for cancelled/on-hiatus ones. A guessed Ongoing would
+        // shadow an explicit status from another provider.
         const string xml = """
             <anime id="99">
               <titles><title xml:lang="x-jat" type="main">Endless Show</title></titles>
               <startdate>2000-01-01</startdate>
+            </anime>
+            """;
+        var json = JsonSerializer.Serialize(AniDbAnimeParser.Parse(xml));
+
+        var data = new AniDbHttpProvider(client: null!).Parse(json);
+
+        Assert.Null(data.Status);
+    }
+
+    [Fact]
+    public void Provider_parse_derives_announced_status_for_future_start_even_with_end_date()
+    {
+        // A fully scheduled unaired season has both dates in the future — the start date
+        // must win, not the end-date branch (which would call it Ongoing).
+        const string xml = """
+            <anime id="99">
+              <titles><title xml:lang="x-jat" type="main">Upcoming Show</title></titles>
+              <startdate>2999-01-01</startdate>
+              <enddate>2999-03-20</enddate>
+            </anime>
+            """;
+        var json = JsonSerializer.Serialize(AniDbAnimeParser.Parse(xml));
+
+        var data = new AniDbHttpProvider(client: null!).Parse(json);
+
+        Assert.Equal(WorkStatus.Announced, data.Status);
+    }
+
+    [Fact]
+    public void Provider_parse_derives_ongoing_status_when_airing_toward_scheduled_end()
+    {
+        const string xml = """
+            <anime id="99">
+              <titles><title xml:lang="x-jat" type="main">Airing Show</title></titles>
+              <startdate>2000-01-01</startdate>
+              <enddate>2999-12-31</enddate>
             </anime>
             """;
         var json = JsonSerializer.Serialize(AniDbAnimeParser.Parse(xml));

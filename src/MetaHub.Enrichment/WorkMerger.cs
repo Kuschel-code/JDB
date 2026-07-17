@@ -42,8 +42,11 @@ public class WorkMerger
         work.ReleaseYear = Pick(writeMode, work.ReleaseYear, First(ordered, d => d.ReleaseYear),
             isEmpty: v => v is null);
 
-        var status = First(ordered, d => d.Status);
-        if (status is { } s && s != WorkStatus.Unknown &&
+        // First *usable* status: providers report Unknown for unmapped values, and a
+        // higher-priority Unknown must not shadow a lower-priority real status.
+        var status = ordered.Select(d => d.Status)
+            .FirstOrDefault(v => v.HasValue && v.Value != WorkStatus.Unknown);
+        if (status is { } s &&
             (writeMode == EnrichmentWriteMode.Overwrite || work.Status == WorkStatus.Unknown))
             work.Status = s;
 

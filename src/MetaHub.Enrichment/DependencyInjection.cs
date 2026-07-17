@@ -27,7 +27,9 @@ public static class DependencyInjection
         AddResilientClient(services, OpenLibraryProvider.HttpClientName);
         AddResilientClient(services, GoogleBooksProvider.HttpClientName, redactUrl: true);
         AddResilientClient(services, AnnictProvider.HttpClientName);
-        AddResilientClient(services, AniDbHttpClient.HttpClientName);
+        // Cap the buffered (compressed) body — the client's own 10 MB cap only bounds the
+        // decompressed side, after the download has already been buffered in full.
+        AddResilientClient(services, AniDbHttpClient.HttpClientName, maxResponseBytes: 8 * 1024 * 1024);
 
         // Anime
         services.AddScoped<IMetadataProvider, AniListProvider>();
@@ -55,13 +57,16 @@ public static class DependencyInjection
         return services;
     }
 
-    private static void AddResilientClient(IServiceCollection services, string name, bool redactUrl = false)
+    private static void AddResilientClient(
+        IServiceCollection services, string name, bool redactUrl = false, long? maxResponseBytes = null)
     {
         var clientBuilder = services.AddHttpClient(name, (sp, client) =>
             {
                 var options = sp.GetRequiredService<IOptions<EnrichmentOptions>>().Value;
                 client.Timeout = TimeSpan.FromSeconds(30);
                 client.DefaultRequestHeaders.UserAgent.ParseAdd(options.UserAgent);
+                if (maxResponseBytes is { } cap)
+                    client.MaxResponseContentBufferSize = cap;
             })
             // Transient errors (5xx, 408, HttpRequestException) plus 429, retried with backoff.
             .AddTransientHttpErrorPolicy(builder => builder
