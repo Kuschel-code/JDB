@@ -48,16 +48,18 @@ public class AniDbHttpProvider : IMetadataProvider
         data.OriginalTitle = anime.OriginalTitle;
         data.Overview = anime.Description;
         data.EpisodeCount = anime.EpisodeCount;
+        data.Status = DeriveStatus(anime.StartDate, anime.EndDate);
 
         if (anime.StartDate is { Length: >= 4 } sd && int.TryParse(sd[..4], out var year))
             data.ReleaseYear = year;
 
-        foreach (var t in anime.Titles)
+        // Best title per language: official > main > synonym > short (not first-encountered —
+        // AniDB does not guarantee element order, and a synonym must not shadow the official name).
+        foreach (var group in anime.Titles
+                     .Where(t => !string.IsNullOrWhiteSpace(t.Text) && !string.IsNullOrWhiteSpace(t.Lang))
+                     .GroupBy(t => t.Lang!))
         {
-            if (string.IsNullOrWhiteSpace(t.Text) || string.IsNullOrWhiteSpace(t.Lang))
-                continue;
-            if (!data.TitleTranslations.ContainsKey(t.Lang))
-                data.TitleTranslations[t.Lang] = t.Text;
+            data.TitleTranslations[group.Key] = group.MinBy(t => TitleTypeRank(t.Type))!.Text;
         }
 
         foreach (var tag in anime.Tags)
@@ -88,5 +90,40 @@ public class AniDbHttpProvider : IMetadataProvider
         }
 
         return data;
+    }
+
+    private static int TitleTypeRank(string? type) => type switch
+    {
+        "official" => 0,
+        "main" => 1,
+        "synonym" => 2,
+        "short" => 3,
+        _ => 4
+    };
+
+    /// <summary>
+    /// Derives the work status from AniDB's air dates (there is no explicit status field).
+    /// Deliberately conservative: only date constellations that are unambiguous evidence
+    /// produce a value. "Started with no end date" stays null — AniDB omits the end date
+    /// for some finished works and for cancelled/on-hiatus ones, so guessing Ongoing there
+    /// would override an explicit status from another provider with a wrong one. Partial
+    /// dates ("1998", "1998-04") never count as evidence.
+    /// </summary>
+    private static WorkStatus? DeriveStatus(string? startDate, string? endDate)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var hasStart = DateOnly.TryParseExact(startDate, "yyyy-MM-dd", out var start);
+        var hasEnd = DateOnly.TryParseExact(endDate, "yyyy-MM-dd", out var end);
+
+        if (hasStart && start > today)
+            return WorkStatus.Announced;
+
+        if (hasEnd && end < today)
+            return WorkStatus.Finished;
+
+        if (hasStart && hasEnd) // started, scheduled end still ahead
+            return WorkStatus.Ongoing;
+
+        return null;
     }
 }

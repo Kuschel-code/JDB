@@ -45,6 +45,7 @@ public static class AniDbAnimeParser
             EpisodeCount = episodeCount,
             Type = root.Element("type")?.Value,
             StartDate = root.Element("startdate")?.Value,
+            EndDate = root.Element("enddate")?.Value,
             Description = root.Element("description")?.Value,
             PictureUrl = BuildPictureUrl(root.Element("picture")?.Value)
         };

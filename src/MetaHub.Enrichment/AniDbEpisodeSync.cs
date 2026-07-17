@@ -72,7 +72,8 @@ public class AniDbEpisodeSync
                 row.AniDbEpisodeId = ep.Id;
                 row.Kind = kind;
                 row.RawEpno = ep.RawEpno;
-                row.AbsoluteNumber ??= kind == EpisodeKind.Regular ? number : null;
+                if (kind == EpisodeKind.Regular)
+                    row.AbsoluteNumber ??= number;
             }
             else
             {

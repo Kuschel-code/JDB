@@ -66,6 +66,25 @@ public class WorkMergerTests
     }
 
     [Fact]
+    public async Task Unknown_status_from_a_higher_priority_provider_does_not_shadow_a_real_one()
+    {
+        // AniList maps unrecognized statuses to Unknown (non-null). A lower-priority provider's
+        // real status (e.g. AniDB's date-derived Finished) must still be applied.
+        await using var db = NewDb();
+        var work = new Work { MediaType = MediaType.Anime, CanonicalTitle = "x" };
+        db.Works.Add(work);
+        await db.SaveChangesAsync();
+
+        var higherUnknown = new NormalizedWorkData { Source = ExternalIdSource.AniList, Status = WorkStatus.Unknown };
+        var lowerFinished = new NormalizedWorkData { Source = ExternalIdSource.AniDb, Status = WorkStatus.Finished };
+
+        await new WorkMerger(db).ApplyAsync(work, new[] { higherUnknown, lowerFinished }, EnrichmentWriteMode.Overwrite);
+        await db.SaveChangesAsync();
+
+        Assert.Equal(WorkStatus.Finished, (await db.Works.AsNoTracking().SingleAsync(w => w.Id == work.Id)).Status);
+    }
+
+    [Fact]
     public async Task TitleTranslations_are_added_even_when_the_canonical_title_is_kept()
     {
         // Reproduces the "romaji title shown" bug: manami seeds the romaji CanonicalTitle, then
