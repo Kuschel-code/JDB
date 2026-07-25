@@ -165,7 +165,12 @@ public sealed class AniDbUdpClient : IAniDbClient, IDisposable
         }
     }
 
-    /// <summary>Drains datagrams already sitting in the receive buffer (stale replies).</summary>
+    /// <summary>
+    /// Drains datagrams already sitting in the receive buffer (stale replies). Never disposes the
+    /// socket: the caller sends on it immediately afterwards. On Windows a datagram sent to a port
+    /// that has since closed comes back as an ICMP rejection and surfaces here as a
+    /// SocketException — which is exactly the stale traffic being drained, so it is swallowed.
+    /// </summary>
     private void DiscardQueuedDatagrams()
     {
         if (_udp is null)
@@ -181,8 +186,11 @@ public sealed class AniDbUdpClient : IAniDbClient, IDisposable
         }
         catch (SocketException)
         {
-            // Socket is unusable — drop it so the next send starts from a fresh one.
-            ResetConnection();
+            // Nothing left worth reading; a genuinely dead socket fails on the send that follows.
+        }
+        catch (ObjectDisposedException)
+        {
+            // Raced with Dispose() — the send that follows reports it.
         }
     }
 
