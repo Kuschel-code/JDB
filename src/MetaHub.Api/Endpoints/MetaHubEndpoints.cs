@@ -163,6 +163,12 @@ public static class MetaHubEndpoints
         {
             return Results.NotFound($"File not found: {request.Path}");
         }
+        catch (TimeoutException ex)
+        {
+            // AniDB did not answer in time. The hash is already stored, so a retry is cheap —
+            // report it as an upstream timeout rather than an internal error.
+            return Results.Problem(ex.Message, statusCode: StatusCodes.Status504GatewayTimeout);
+        }
     }
 
     private static async Task<IResult> RunAnimeIngest(AnimeIngestRunner runner, CancellationToken ct)

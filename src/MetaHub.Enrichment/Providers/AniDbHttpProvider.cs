@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 using MetaHub.Domain.Entities;
 using MetaHub.Domain.Enums;
 using MetaHub.Identification.AniDb;
@@ -13,11 +14,22 @@ namespace MetaHub.Enrichment.Providers;
 public class AniDbHttpProvider : IMetadataProvider
 {
     private readonly AniDbHttpClient _client;
+    private readonly TimeSpan _cacheTtl;
 
-    public AniDbHttpProvider(AniDbHttpClient client) => _client = client;
+    public AniDbHttpProvider(AniDbHttpClient client, IOptions<AniDbOptions> options)
+    {
+        _client = client;
+        _cacheTtl = options.Value.AnimeCacheTtl;
+    }
 
     public ExternalIdSource Source => ExternalIdSource.AniDb;
     public int Priority => 12;
+
+    /// <summary>
+    /// AniDB permits roughly one fetch per anime per day and bans on abuse, so its payloads are
+    /// held far longer than the global TTL (default 14 days, configurable via AniDb:AnimeCacheTtl).
+    /// </summary>
+    public TimeSpan? MinCacheTtl => _cacheTtl > TimeSpan.Zero ? _cacheTtl : null;
 
     public string? GetExternalId(Work work)
         => work.ExternalIds.FirstOrDefault(x => x.Source == ExternalIdSource.AniDb)?.ExternalValue;

@@ -18,6 +18,13 @@ public interface IMetadataProvider
     /// </summary>
     int Priority { get; }
 
+    /// <summary>
+    /// A floor under the enrichment cache lifetime for this provider, for sources whose terms
+    /// are stricter than the global TTL (AniDB allows one fetch per anime per day and bans
+    /// aggressively). Null — the default — means the global TTL applies unchanged.
+    /// </summary>
+    TimeSpan? MinCacheTtl => null;
+
     /// <summary>Returns the provider's external id for this work, or null if not applicable.</summary>
     string? GetExternalId(Work work);
 

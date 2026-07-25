@@ -137,14 +137,68 @@ public sealed class AniDbUdpClient : IAniDbClient, IDisposable
     {
         await ThrottleAsync(ct);
 
+        // Discard anything already queued: UDP has no request/response correlation, so a reply
+        // that arrived after a previous command timed out would otherwise be read as the answer
+        // to *this* command — silently attaching one file's anime/episode ids to another file.
+        DiscardQueuedDatagrams();
+
         var payload = Encoding.UTF8.GetBytes(command);
         await _udp!.SendAsync(payload, payload.Length);
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(_options.ReceiveTimeoutSeconds));
 
-        var result = await _udp.ReceiveAsync(timeout.Token);
-        return Encoding.UTF8.GetString(result.Buffer);
+        try
+        {
+            var result = await _udp.ReceiveAsync(timeout.Token);
+            return Encoding.UTF8.GetString(result.Buffer);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Timed out waiting. The reply may still be in flight and would land in this
+            // socket's buffer, so retire the socket entirely — a late datagram can then never
+            // be mistaken for a future command's reply. The session is bound to the local port,
+            // so it is dropped too; the caller's 501/502/506 path re-authenticates.
+            ResetConnection();
+            throw new TimeoutException(
+                $"AniDB did not reply within {_options.ReceiveTimeoutSeconds}s.");
+        }
+    }
+
+    /// <summary>
+    /// Drains datagrams already sitting in the receive buffer (stale replies). Never disposes the
+    /// socket: the caller sends on it immediately afterwards. On Windows a datagram sent to a port
+    /// that has since closed comes back as an ICMP rejection and surfaces here as a
+    /// SocketException — which is exactly the stale traffic being drained, so it is swallowed.
+    /// </summary>
+    private void DiscardQueuedDatagrams()
+    {
+        if (_udp is null)
+            return;
+
+        try
+        {
+            while (_udp.Available > 0)
+            {
+                System.Net.IPEndPoint? from = null;
+                _udp.Receive(ref from); // Available > 0 guarantees this does not block
+            }
+        }
+        catch (SocketException)
+        {
+            // Nothing left worth reading; a genuinely dead socket fails on the send that follows.
+        }
+        catch (ObjectDisposedException)
+        {
+            // Raced with Dispose() — the send that follows reports it.
+        }
+    }
+
+    private void ResetConnection()
+    {
+        _udp?.Dispose();
+        _udp = null;
+        _session = null;
     }
 
     private async Task ThrottleAsync(CancellationToken ct)
