@@ -32,6 +32,19 @@ public class TitleNormalizationTests
     }
 
     [Fact]
+    public void Separator_set_is_pinned_to_the_hand_written_sql_replace_chain()
+    {
+        // MetaHubBackend.ResolveByNameAsync repeats this set as a literal .Replace() chain so
+        // EF can translate it to SQL. The two cannot be shared (EF only translates the literal
+        // chain), so they are kept in sync by this guard: if you change Separators, update the
+        // chain in ResolveByNameAsync — otherwise C#-side and SQL-side normalization disagree
+        // and titles containing the new separator silently stop matching by name.
+        Assert.Equal(
+            new[] { " ", "/", "-", ":", ".", ",", "'", "!", "?", "_", "(", ")", "[", "]", "{", "}" },
+            TitleNormalization.Separators);
+    }
+
+    [Fact]
     public void SearchTitles_match_a_bracketed_title_from_a_parenthesised_needle()
     {
         // The stored search blob is built from the bracketed canonical; a folder using parentheses

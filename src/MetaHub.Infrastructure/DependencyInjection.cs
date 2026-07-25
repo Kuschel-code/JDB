@@ -1,5 +1,8 @@
 using System.Data;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MetaHub.Infrastructure;
@@ -49,13 +52,6 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// Schema version of the embedded SQLite database. Bump when the model changes in a way
-    /// that <see cref="DatabaseFacade.EnsureCreated"/> cannot reconcile on an existing file
-    /// (e.g. a column's storage type changes), so the cache is rebuilt instead of breaking.
-    /// </summary>
-    private const long EmbeddedSchemaVersion = 5;
-
-    /// <summary>
     /// Creates the SQLite schema if it does not exist yet (embedded mode). The embedded
     /// database is a rebuildable cache (ingested datasets + cached enrichment), so when the
     /// schema version changes it is wiped and recreated — no migration, no durable data lost.
@@ -71,12 +67,17 @@ public static class DependencyInjection
             return;
         }
 
-        if (ReadSqliteUserVersion(db) != EmbeddedSchemaVersion)
+        // Derived from the model itself, so adding/changing a column can never be shipped
+        // without triggering the rebuild (a hand-maintained constant was forgotten once and
+        // left embedded installs querying columns their database did not have).
+        var schemaVersion = ComputeSchemaVersion(db.Model);
+
+        if (ReadSqliteUserVersion(db) != schemaVersion)
         {
             // Incompatible (or pre-versioning) schema — drop and rebuild from the current model.
             db.Database.EnsureDeleted();
             db.Database.EnsureCreated();
-            db.Database.ExecuteSqlRaw($"PRAGMA user_version = {EmbeddedSchemaVersion};");
+            db.Database.ExecuteSqlRaw($"PRAGMA user_version = {schemaVersion};");
         }
         else
         {
@@ -87,6 +88,48 @@ public static class DependencyInjection
         // concurrent scan readers and the single enrichment writer coexist without "database is
         // locked". The per-connection busy_timeout is handled by SqlitePragmaInterceptor.
         db.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
+    }
+
+    /// <summary>
+    /// A stable fingerprint of everything <see cref="DatabaseFacade.EnsureCreated"/> would put
+    /// into the schema: tables, columns (store type + nullability) and indexes. Ordered so the
+    /// same model always yields the same string regardless of metadata enumeration order.
+    /// Exposed for tests.
+    /// </summary>
+    internal static string BuildModelFingerprint(IModel model)
+    {
+        var sb = new StringBuilder();
+        foreach (var entity in model.GetEntityTypes().OrderBy(e => e.Name, StringComparer.Ordinal))
+        {
+            sb.Append(entity.GetTableName() ?? entity.Name).Append('{');
+
+            foreach (var property in entity.GetProperties().OrderBy(p => p.Name, StringComparer.Ordinal))
+                sb.Append(property.Name).Append(':')
+                  // Fall back to the CLR type so a provider that reports no store type still
+                  // contributes type information — otherwise int->string would go unnoticed.
+                  .Append(property.GetColumnType() ?? property.ClrType.FullName)
+                  .Append(property.IsNullable ? "?," : "!,");
+
+            foreach (var index in entity.GetIndexes()
+                         .Select(i => string.Join('+', i.Properties.Select(p => p.Name)) + (i.IsUnique ? "!" : ""))
+                         .OrderBy(i => i, StringComparer.Ordinal))
+                sb.Append("ix(").Append(index).Append(')');
+
+            sb.Append('}');
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Hashes <see cref="BuildModelFingerprint"/> into SQLite's <c>user_version</c>, which is a
+    /// signed 32-bit field — so the value is masked to 31 bits, and 0 (the value a fresh database
+    /// reports) is never produced.
+    /// </summary>
+    internal static int ComputeSchemaVersion(IModel model)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(BuildModelFingerprint(model)));
+        var value = BitConverter.ToInt32(hash, 0) & 0x7FFFFFFF;
+        return value == 0 ? 1 : value;
     }
 
     private static long ReadSqliteUserVersion(MetaHubDbContext db)

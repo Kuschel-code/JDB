@@ -10,6 +10,10 @@ namespace MetaHub.Tests;
 
 public class AniDbHttpTests
 {
+    /// <summary>Parse-only tests never touch the HTTP client, so a null client is safe here.</summary>
+    private static AniDbHttpProvider NewProvider(AniDbOptions? options = null) =>
+        new(client: null!, Microsoft.Extensions.Options.Options.Create(options ?? new AniDbOptions()));
+
     private const string SampleAnimeXml = """
         <?xml version="1.0" encoding="UTF-8"?>
         <anime id="1" restricted="false">
@@ -202,7 +206,7 @@ public class AniDbHttpTests
         var anime = AniDbAnimeParser.Parse(SampleAnimeXml);
         var json = JsonSerializer.Serialize(anime);
 
-        var provider = new AniDbHttpProvider(client: null!);
+        var provider = NewProvider();
         var data = provider.Parse(json);
 
         Assert.Equal(ExternalIdSource.AniDb, data.Source);
@@ -220,7 +224,7 @@ public class AniDbHttpTests
         var anime = AniDbAnimeParser.Parse(SampleAnimeXml);
         var json = JsonSerializer.Serialize(anime);
 
-        var data = new AniDbHttpProvider(client: null!).Parse(json);
+        var data = NewProvider().Parse(json);
 
         Assert.Equal("Cowboy Bebop", data.TitleTranslations["x-jat"]);
         Assert.Equal("Cowboy Bebop", data.TitleTranslations["en"]);
@@ -235,7 +239,7 @@ public class AniDbHttpTests
         var anime = AniDbAnimeParser.Parse(SampleAnimeXml);
         var json = JsonSerializer.Serialize(anime);
 
-        var data = new AniDbHttpProvider(client: null!).Parse(json);
+        var data = NewProvider().Parse(json);
 
         Assert.Equal(WorkStatus.Finished, data.Status);
     }
@@ -254,7 +258,7 @@ public class AniDbHttpTests
             """;
         var json = JsonSerializer.Serialize(AniDbAnimeParser.Parse(xml));
 
-        var data = new AniDbHttpProvider(client: null!).Parse(json);
+        var data = NewProvider().Parse(json);
 
         Assert.Null(data.Status);
     }
@@ -273,7 +277,7 @@ public class AniDbHttpTests
             """;
         var json = JsonSerializer.Serialize(AniDbAnimeParser.Parse(xml));
 
-        var data = new AniDbHttpProvider(client: null!).Parse(json);
+        var data = NewProvider().Parse(json);
 
         Assert.Equal(WorkStatus.Announced, data.Status);
     }
@@ -290,7 +294,7 @@ public class AniDbHttpTests
             """;
         var json = JsonSerializer.Serialize(AniDbAnimeParser.Parse(xml));
 
-        var data = new AniDbHttpProvider(client: null!).Parse(json);
+        var data = NewProvider().Parse(json);
 
         Assert.Equal(WorkStatus.Ongoing, data.Status);
     }
@@ -306,7 +310,7 @@ public class AniDbHttpTests
             """;
         var json = JsonSerializer.Serialize(AniDbAnimeParser.Parse(xml));
 
-        var data = new AniDbHttpProvider(client: null!).Parse(json);
+        var data = NewProvider().Parse(json);
 
         Assert.Null(data.Status);
     }
@@ -317,7 +321,7 @@ public class AniDbHttpTests
         var anime = AniDbAnimeParser.Parse(SampleAnimeXml);
         var json = JsonSerializer.Serialize(anime);
 
-        var data = new AniDbHttpProvider(client: null!).Parse(json);
+        var data = NewProvider().Parse(json);
 
         Assert.Contains(data.Images, i =>
             i.Type == ImageType.Poster &&
@@ -331,7 +335,7 @@ public class AniDbHttpTests
         var anime = AniDbAnimeParser.Parse(SampleAnimeXml);
         var json = JsonSerializer.Serialize(anime);
 
-        var data = new AniDbHttpProvider(client: null!).Parse(json);
+        var data = NewProvider().Parse(json);
 
         Assert.Contains(data.Credits, c =>
             c.Name == "Yamadera Koichi" &&
@@ -347,7 +351,7 @@ public class AniDbHttpTests
     [Fact]
     public void Provider_parse_survives_invalid_json()
     {
-        var data = new AniDbHttpProvider(client: null!).Parse("not json");
+        var data = NewProvider().Parse("not json");
 
         Assert.Equal(ExternalIdSource.AniDb, data.Source);
         Assert.Null(data.CanonicalTitle);
@@ -359,14 +363,14 @@ public class AniDbHttpTests
         var work = new Work();
         work.ExternalIds.Add(new ExternalId { Source = ExternalIdSource.AniDb, ExternalValue = "1" });
 
-        Assert.Equal("1", new AniDbHttpProvider(client: null!).GetExternalId(work));
+        Assert.Equal("1", NewProvider().GetExternalId(work));
     }
 
     [Fact]
     public void Provider_get_external_id_returns_null_when_absent()
     {
         var work = new Work();
-        Assert.Null(new AniDbHttpProvider(client: null!).GetExternalId(work));
+        Assert.Null(NewProvider().GetExternalId(work));
     }
 
     // --- JSON round-trip ---
@@ -424,5 +428,35 @@ public class AniDbHttpTests
     {
         var ep = new AniDbEpisode { Id = 1, RawEpno = rawEpno, EpnoType = 1 };
         Assert.Equal(expected, ep.ParsedNumber);
+    }
+
+    // --- Cache lifetime ---
+
+    [Fact]
+    public void Provider_reports_the_configured_cache_ttl()
+    {
+        // AniDB allows ~one fetch per anime per day and bans on abuse, so its payloads must
+        // outlive the global TTL (which drops to one day for ongoing works).
+        var provider = NewProvider(new AniDbOptions { AnimeCacheTtl = TimeSpan.FromDays(14) });
+
+        Assert.Equal(TimeSpan.FromDays(14), provider.MinCacheTtl);
+    }
+
+    [Fact]
+    public void Provider_cache_ttl_can_be_disabled_by_configuring_zero()
+    {
+        // An explicit zero opts back into the global TTL rather than pinning it to nothing.
+        var provider = NewProvider(new AniDbOptions { AnimeCacheTtl = TimeSpan.Zero });
+
+        Assert.Null(provider.MinCacheTtl);
+    }
+
+    [Fact]
+    public void Other_providers_keep_the_global_ttl_by_default()
+    {
+        // The interface default must leave the ten existing providers untouched.
+        IMetadataProvider anilist = new AniListProvider(factory: null!);
+
+        Assert.Null(anilist.MinCacheTtl);
     }
 }

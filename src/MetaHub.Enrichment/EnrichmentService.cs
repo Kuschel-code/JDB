@@ -80,7 +80,13 @@ public class EnrichmentService
             // parse must not abort the whole work's enrichment and discard the other providers' data.
             try
             {
-                string? body = forceRefresh ? null : await GetCachedBodyAsync(workId, provider.Source, ttl, ct);
+                // A provider may require a longer cache lifetime than the global TTL. Honor it
+                // even on a forced refresh: "force" is about re-reading our own sources, not
+                // about overriding a rate limit that gets the whole instance banned.
+                var providerTtl = provider.MinCacheTtl is { } min && min > ttl ? min : ttl;
+                string? body = forceRefresh && provider.MinCacheTtl is null
+                    ? null
+                    : await GetCachedBodyAsync(workId, provider.Source, providerTtl, ct);
                 bool fromCache = body is not null;
 
                 if (body is null)
