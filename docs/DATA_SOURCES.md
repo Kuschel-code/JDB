@@ -80,14 +80,19 @@ Researched on request: MetaHub's anime/movie sources skew EN/JA. These are offic
 non-scraping options for China- and Korea-native metadata (Japan is already well covered
 above via Annict/Syoboi/MediaArts DB).
 
+**Deprioritized: China.** Chinese-sourced metadata (Bangumi included) is subject to PRC
+content moderation — Douban is documented removing award mentions and LGBTQ-themed
+listings under political pressure — a real accuracy/consistency risk for a project whose
+job is to be a canonical source, not just an additional-language nice-to-have. Kept below
+for the record, but Japan-depth and the translation question (next section) are the
+priority instead.
+
 - **Bangumi (bgm.tv)** 🔑⚠️ — China's largest ACG (anime/comic/game) database. Official
   public API at `api.bgm.tv/v0/`, open-source server (Go, [bangumi/server] on GitHub).
   OAuth2 (authorization-code grant, 7-day access tokens + refresh) or a simpler personal
-  access token for read-mostly use. **The standout candidate**: fills the one real content
-  gap in the current lineup — Chinese-language titles/synopses, and *donghua* (Chinese
-  animation) coverage, which AniList/MAL/Jikan track inconsistently since it isn't their
-  focus. No confirmed commercial-use terms found in research — verify before relying on it
-  for anything beyond personal/self-hosted use, same caution as AniDB.
+  access token for read-mostly use. Would fill a real content gap — Chinese-language
+  titles/synopses and *donghua* (Chinese animation) coverage — but see the moderation
+  caveat above; no confirmed commercial-use terms found either. Not pursued for now.
 - **Naver Open API (Korea)** 🔑 — Naver (Korea's dominant search engine) exposes dedicated
   Movie, Book, and Encyclopedia search endpoints (`openapi.naver.com/v1/search/...`),
   simple `X-Naver-Client-Id`/`X-Naver-Client-Secret` header auth (no OAuth flow), 25,000
@@ -113,8 +118,47 @@ Investigated and **ruled out**:
 - **Bilibili / Tencent Video / iQiyi donghua metadata** — these platforms host most
   donghua but publish no public metadata API; only option would be scraping. Bangumi
   covers the same content gap legitimately instead.
+- **Filmarks / Eiga.com (Japan)** — Japan's largest movie/anime review apps (Filmarks:
+  ~120k movies, ~20k dramas, ~6k anime cataloged; Eiga.com founded 1998, one of Japan's
+  biggest film info sites). Neither publishes a public API — no developer portal found for
+  either. Would have been a strong native-Japanese review/rating source; scraping-only,
+  so not viable under this project's rule.
 
 [bangumi/server]: https://github.com/bangumi/server
+
+## Translation coverage (the "why is my anime overview in English" question)
+
+No currently integrated anime provider supplies overview text outside en/ja/ru — confirmed
+by reading every provider's `OverviewTranslations` usage: AniList and Kitsu only carry
+en/ja titles (no translated overview at all), Jikan is English-only, Annict is Japanese-only,
+Shikimori is the one anime source with a translated overview, and it's Russian
+(`data.OverviewTranslations["ru"]`). TMDB is the only source that can supply a genuinely
+localized (e.g. German) overview, via its `language=` query param — but that only reaches
+anime that has a Fribb-derived TMDB cross-id *and* a community-contributed translation
+there. For most anime, a non-English/non-Japanese `PreferredLanguage` user gets an English
+overview and no more.
+
+Researched as a possible fix — a machine-translation fallback (translate the
+highest-priority available overview into `PreferredLanguage` only when no native
+translation exists, cached hard so it runs once per work):
+
+- **DeepL API** — best translation quality of the three, but **API Free was discontinued
+  for new customers in July 2026**; new integrations only get paid Developer/Growth plans.
+  No longer a "free tier" option.
+- **Google Cloud Translation API** — genuine free tier (500k characters/month, recurring,
+  permanent, good NMT quality) — but requires a GCP account with billing details on file
+  even though usage stays free, which is friction beyond MetaHub's "no account, no cloud
+  dependency" defaults for most providers.
+- **LibreTranslate** — zero cost, zero account/ToS friction, but runs as its own service
+  (Docker container) — contradicts the embedded mode's "no Docker, no server" pitch for
+  most users — and quality is noticeably weaker (more grammar errors, occasional meaning
+  shifts) than DeepL/Google.
+
+**Decision: not implemented.** Every option adds either a cost/billing dependency or an
+extra self-hosted service, for a feature that only affects the overview text of anime
+without an English/Japanese/Russian description already covering it. English remains the
+fallback. Revisit if DeepL reinstates a free tier, or if a user wants to self-host
+LibreTranslate and have MetaHub call it optionally.
 
 ## Books
 
