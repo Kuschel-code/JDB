@@ -74,6 +74,48 @@ Japanese sources (native titles, Japanese episode data):
 - **kawaiioverflow/arm** 🆓 — mapping dataset MAL/AniList ↔ Annict/Syobocal. **(Used in ingest.)**
 - **metachan-api** 🆓 — community project unifying anime & manga metadata (self-hostable).
 
+## Regional direct connections (China, Korea, Japan)
+
+Researched on request: MetaHub's anime/movie sources skew EN/JA. These are official,
+non-scraping options for China- and Korea-native metadata (Japan is already well covered
+above via Annict/Syoboi/MediaArts DB).
+
+- **Bangumi (bgm.tv)** 🔑⚠️ — China's largest ACG (anime/comic/game) database. Official
+  public API at `api.bgm.tv/v0/`, open-source server (Go, [bangumi/server] on GitHub).
+  OAuth2 (authorization-code grant, 7-day access tokens + refresh) or a simpler personal
+  access token for read-mostly use. **The standout candidate**: fills the one real content
+  gap in the current lineup — Chinese-language titles/synopses, and *donghua* (Chinese
+  animation) coverage, which AniList/MAL/Jikan track inconsistently since it isn't their
+  focus. No confirmed commercial-use terms found in research — verify before relying on it
+  for anything beyond personal/self-hosted use, same caution as AniDB.
+- **Naver Open API (Korea)** 🔑 — Naver (Korea's dominant search engine) exposes dedicated
+  Movie, Book, and Encyclopedia search endpoints (`openapi.naver.com/v1/search/...`),
+  simple `X-Naver-Client-Id`/`X-Naver-Client-Secret` header auth (no OAuth flow), 25,000
+  calls/day free quota, commercial use explicitly allowed with attribution. Good fit for
+  Korean movies/dramas and Korean-language book titles — the lowest-friction of the three
+  Korean options to integrate.
+- **KMDb (한국영상자료원)** 🔑 — the Korean Film Archive's (government, Ministry of Culture)
+  official movie database; Open API exists (kmdb.or.kr/info/api). More authoritative for
+  pure Korean film data than Naver, but requires a site membership account — more signup
+  friction for comparable value, so prefer Naver unless KMDb-specific depth is needed.
+- **Aladin Open API (Korea)** 🔑 — major Korean online bookstore; book search, ISBN lookup,
+  bestseller lists via a TTB key. Candidate for Korean book coverage alongside Open
+  Library/Google Books, same role the DNB (German) entry plays below.
+- **National Diet Library Search API (Japan)** 🆓 — official Japanese National Diet Library;
+  ISBN/bibliographic search, no key needed. ⚠️ The Book Cover API portion is being shut
+  down 2026-03-31 (JPRO licensing change) — bibliographic text data only, no cover images
+  from this source going forward.
+
+Investigated and **ruled out**:
+- **Douban (China)** — no viable official API; the developer API has been dead for years
+  and every current "Douban API" offering found is an HTML scraper. Contradicts this
+  project's official-APIs-only rule; don't revisit unless Douban ships a real API again.
+- **Bilibili / Tencent Video / iQiyi donghua metadata** — these platforms host most
+  donghua but publish no public metadata API; only option would be scraping. Bangumi
+  covers the same content gap legitimately instead.
+
+[bangumi/server]: https://github.com/bangumi/server
+
 ## Books
 
 Primary:
