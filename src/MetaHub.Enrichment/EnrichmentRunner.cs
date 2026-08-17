@@ -51,9 +51,25 @@ public class EnrichmentRunner
         foreach (var id in ids)
         {
             ct.ThrowIfCancellationRequested();
-            var result = await _service.EnrichAsync(id, forceRefresh, writeMode, ct);
-            if (result.Applied.Count > 0)
-                enriched++;
+
+            // One work's unexpected failure (a bug, a DB error) must not cost every other work
+            // in this batch its turn — EnrichmentService already isolates per-provider failures,
+            // this is the same isolation one level up.
+            try
+            {
+                var result = await _service.EnrichAsync(id, forceRefresh, writeMode, ct);
+                if (result.Applied.Count > 0)
+                    enriched++;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "Enrichment failed for work {WorkId}", id);
+            }
+
             done++;
             progress?.Report(100.0 * done / ids.Count);
 

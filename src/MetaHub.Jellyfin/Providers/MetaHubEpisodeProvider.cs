@@ -10,8 +10,11 @@ namespace MetaHub.Jellyfin.Providers;
 /// episode (title, overview, air date) from the local episode table — filled by the
 /// enrichment task. Falls back to absolute numbering, which anime libraries commonly use.
 /// </summary>
-public class MetaHubEpisodeProvider : IRemoteMetadataProvider<Episode, EpisodeInfo>
+public class MetaHubEpisodeProvider : IRemoteMetadataProvider<Episode, EpisodeInfo>, IHasOrder
 {
+    // See MetaHubMovieProvider.Order for the reasoning.
+    public int Order => 40;
+
     private readonly IMetaHubBackend _backend;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly MetaHubItemGate _gate;

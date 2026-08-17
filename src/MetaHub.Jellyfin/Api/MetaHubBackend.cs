@@ -95,12 +95,16 @@ public class MetaHubBackend : IMetaHubBackend
             await enrichment.EnrichAsync(work.Id, false, null, ct).ConfigureAwait(false);
             return await LoadWorkAsync(db, work.Id, ct).ConfigureAwait(false) ?? work;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            throw;
+            throw; // the caller asked us to stop
         }
         catch
         {
+            // Also catches an HttpClient-internal timeout inside a provider fetch (see
+            // EnrichmentService's matching catch for why that surfaces as OperationCanceledException
+            // without ct itself being cancelled) — falls through to best-effort instead of failing
+            // this item's whole metadata refresh.
             return work; // best-effort: serve whatever is already stored
         }
         finally

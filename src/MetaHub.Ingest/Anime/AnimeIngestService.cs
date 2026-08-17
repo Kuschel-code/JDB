@@ -36,7 +36,25 @@ public class AnimeIngestService
             .ToDictionaryAsync(x => Key(x.Source, x.ExternalValue), x => x.WorkId, ct);
 
         // Works created during this run, so multiple entries sharing an id reuse one work.
+        // Preloaded with everything `index` can resolve to at loop start: any id added to
+        // `index` *during* the loop (below) always points at a work already added to `created`
+        // at the moment it's added, so no id discovered mid-loop can ever require a fetch that
+        // isn't covered by this upfront set — this is the exact set the old per-entry
+        // `FirstAsync` calls resolved anyway, just fetched in one shot instead of once per
+        // already-known entry (the steady-state case: on a re-run of a ~35k-entry dataset,
+        // nearly every entry already exists). Chunked to stay under either provider's
+        // parameter-count ceiling for the IN/= ANY translation of a large .Contains() set.
         var created = new Dictionary<Guid, Work>();
+        foreach (var chunk in index.Values.Distinct().Chunk(500))
+        {
+            var works = await _db.Works
+                .Include(w => w.ExternalIds)
+                .Include(w => w.SeriesDetail)
+                .Where(w => chunk.Contains(w.Id))
+                .ToListAsync(ct);
+            foreach (var w in works)
+                created[w.Id] = w;
+        }
 
         // Works that already have artwork — manami ships a poster/thumbnail URL per anime,
         // which we store for works without any image so every entry has art right after
@@ -74,6 +92,9 @@ public class AnimeIngestService
             }
             else if (existingId is { } id2)
             {
+                // Reachable only if the invariant above doesn't hold (e.g. a future change to
+                // the "add new ids" loop below); kept as a fallback so that case degrades to a
+                // per-entry fetch instead of silently creating a duplicate work.
                 work = await _db.Works
                     .Include(w => w.ExternalIds)
                     .Include(w => w.SeriesDetail)
@@ -152,6 +173,7 @@ public class AnimeIngestService
         // anidb value -> workId
         var byAniDb = await _db.ExternalIds
             .Where(x => x.Source == ExternalIdSource.AniDb)
+            .Select(x => new { x.ExternalValue, x.WorkId })
             .ToDictionaryAsync(x => x.ExternalValue, x => x.WorkId, ct);
 
         // Existing (source,value) set to avoid duplicate inserts.
@@ -228,9 +250,11 @@ public class AnimeIngestService
 
         var byMal = await _db.ExternalIds
             .Where(x => x.Source == ExternalIdSource.Mal)
+            .Select(x => new { x.ExternalValue, x.WorkId })
             .ToDictionaryAsync(x => x.ExternalValue, x => x.WorkId, ct);
         var byAniList = await _db.ExternalIds
             .Where(x => x.Source == ExternalIdSource.AniList)
+            .Select(x => new { x.ExternalValue, x.WorkId })
             .ToDictionaryAsync(x => x.ExternalValue, x => x.WorkId, ct);
 
         var existing = (await _db.ExternalIds

@@ -209,4 +209,70 @@ public class AnimeIngestServiceTests
             if (File.Exists(dbPath)) File.Delete(dbPath);
         }
     }
+
+    [Fact]
+    public async Task IngestManami_reuses_a_work_found_only_via_an_id_added_earlier_in_the_same_run()
+    {
+        // IngestManamiAsync batch-preloads every work `index` could resolve to *before* the loop
+        // starts, to avoid a per-entry DB round trip on re-runs. That preload must still cover a
+        // work whose only reachable id, at preload time, does not exist yet in the database — it
+        // is added by an *earlier* entry in this same run. If the second entry instead created a
+        // duplicate work, this anime would silently end up as two separate library entries.
+        await using var db = NewDb();
+        var service = new AnimeIngestService(db, NullLogger<AnimeIngestService>.Instance);
+
+        var dataset = new ManamiDataset
+        {
+            Data =
+            {
+                new ManamiEntry
+                {
+                    Title = "Shared Anime",
+                    Episodes = 12,
+                    Sources = { "https://anidb.net/anime/777" }
+                },
+                new ManamiEntry
+                {
+                    // Same AniDB id as above (defensive case: a duplicate/near-duplicate dataset
+                    // entry), plus a MAL id this run has not seen before.
+                    Title = "Shared Anime",
+                    Episodes = 12,
+                    Sources = { "https://anidb.net/anime/777", "https://myanimelist.net/anime/999" }
+                }
+            }
+        };
+
+        var result = await service.IngestManamiAsync(dataset);
+
+        Assert.Equal(1, result.Created);
+        Assert.Equal(1, await db.Works.CountAsync());
+
+        var work = await db.Works.Include(w => w.ExternalIds).SingleAsync();
+        Assert.Contains(work.ExternalIds, x => x.Source == ExternalIdSource.AniDb && x.ExternalValue == "777");
+        Assert.Contains(work.ExternalIds, x => x.Source == ExternalIdSource.Mal && x.ExternalValue == "999");
+    }
+
+    [Fact]
+    public async Task IngestManami_updates_the_preloaded_work_on_a_rerun_with_changed_fields()
+    {
+        // The batched preload must return the SAME live tracked entities the per-entry fetch
+        // used to — not a detached/stale snapshot — so field updates on a re-run are saved.
+        await using var db = NewDb();
+        var service = new AnimeIngestService(db, NullLogger<AnimeIngestService>.Instance);
+
+        var dataset = new ManamiDataset
+        {
+            Data = { new ManamiEntry { Title = "Old Title", Episodes = 12, Sources = { "https://anidb.net/anime/1" } } }
+        };
+        await service.IngestManamiAsync(dataset);
+
+        dataset.Data[0].Title = "New Title";
+        dataset.Data[0].Episodes = 13;
+        var second = await service.IngestManamiAsync(dataset);
+
+        Assert.Equal(1, second.Updated);
+        var work = await db.Works.Include(w => w.SeriesDetail).SingleAsync();
+        Assert.Equal("New Title", work.CanonicalTitle);
+        Assert.Equal(13, work.SeriesDetail!.EpisodeCount);
+    }
 }

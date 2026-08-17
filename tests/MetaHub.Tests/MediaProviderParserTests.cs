@@ -59,7 +59,7 @@ public class MediaProviderParserTests
           "media": [ { "track-count": 13 } ]
         }
         """;
-        var data = new MusicBrainzProvider(factory: null!).Parse(json);
+        var data = new MusicBrainzProvider(factory: null!, new MusicBrainzRateLimiter()).Parse(json);
         Assert.Equal("Random Access Memories", data.CanonicalTitle);
         Assert.Equal(2013, data.ReleaseYear);
         Assert.Equal("Columbia", data.Label);

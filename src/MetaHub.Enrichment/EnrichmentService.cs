@@ -50,12 +50,15 @@ public class EnrichmentService
         EnrichmentWriteMode? writeMode = null,
         CancellationToken ct = default)
     {
+        // AsSplitQuery: two collection Includes (ExternalIds, Images) in one query would
+        // cartesian-join across both, like the equivalent loads in MetaHubBackend/MetaHubEndpoints.
         var work = await _db.Works
             .Include(w => w.ExternalIds)
             .Include(w => w.Images)
             .Include(w => w.SeriesDetail)
             .Include(w => w.MusicDetail)
             .Include(w => w.BookDetail)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(w => w.Id == workId, ct);
 
         if (work is null)
@@ -105,12 +108,17 @@ public class EnrichmentService
                 collected.Add(provider.Parse(body));
                 result.Applied.Add($"{provider.Source}{(fromCache ? " (cached)" : "")}");
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                throw; // honor cancellation
+                throw; // the caller asked us to stop
             }
             catch (Exception ex)
             {
+                // Also catches an HttpClient-internal timeout: Polly's retry delays alone
+                // (2+4+8+16s) equal the 30s client timeout before any request time is added, so
+                // the in-flight Task.Delay throws OperationCanceledException on a struggling-but-
+                // not-dead provider — with no `when` guard that used to rethrow past this
+                // provider-isolation boundary and abort every remaining work in the batch.
                 _log.LogWarning(ex, "Enrichment from {Source} failed for work {WorkId}", provider.Source, workId);
             }
         }

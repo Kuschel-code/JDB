@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using MetaHub.Ingest.Anime;
 using Polly;
@@ -22,10 +23,14 @@ public static class DependencyInjection
                 client.Timeout = TimeSpan.FromMinutes(10);
                 client.DefaultRequestHeaders.UserAgent.ParseAdd(options.UserAgent);
             })
-            // Retry transient failures (HttpRequestException, 5xx, 408) with 2s, 4s, 8s, 16s backoff.
-            .AddTransientHttpErrorPolicy(builder => builder.WaitAndRetryAsync(
-                retryCount: 4,
-                sleepDurationProvider: attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))));
+            // Retry transient failures (HttpRequestException, 5xx, 408) plus 429 — the datasets
+            // are pulled from GitHub, which rate-limits unauthenticated requests — with 2s, 4s,
+            // 8s, 16s backoff.
+            .AddTransientHttpErrorPolicy(builder => builder
+                .OrResult(r => r.StatusCode == HttpStatusCode.TooManyRequests)
+                .WaitAndRetryAsync(
+                    retryCount: 4,
+                    sleepDurationProvider: attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))));
 
         services.AddScoped<IDatasetSource, HttpDatasetSource>();
         services.AddScoped<AnimeIngestService>();

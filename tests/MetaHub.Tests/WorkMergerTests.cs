@@ -148,4 +148,45 @@ public class WorkMergerTests
         Assert.Equal(1998, saved.ReleaseYear);
         Assert.Equal(1, await db.WorkGenres.CountAsync(wg => wg.WorkId == work.Id));
     }
+
+    [Fact]
+    public async Task ApplyGenresAsync_reuses_an_existing_genre_case_insensitively_instead_of_duplicating_it()
+    {
+        await using var db = NewDb();
+        db.Genres.Add(new Genre { Name = "Action" });
+        var work = new Work { MediaType = MediaType.Anime, CanonicalTitle = "x" };
+        db.Works.Add(work);
+        await db.SaveChangesAsync();
+
+        var data = new NormalizedWorkData { Source = ExternalIdSource.AniList };
+        data.Genres.Add("action"); // same genre, different case
+        data.Genres.Add("Sci-Fi"); // genuinely new
+
+        await new WorkMerger(db).ApplyAsync(work, new[] { data }, EnrichmentWriteMode.Overwrite);
+        await db.SaveChangesAsync();
+
+        Assert.Equal(2, await db.Genres.CountAsync()); // no duplicate "Action"/"action" row
+        Assert.Equal(2, await db.WorkGenres.CountAsync(wg => wg.WorkId == work.Id));
+    }
+
+    [Fact]
+    public async Task ApplyGenresAsync_does_not_relink_a_genre_the_work_already_has()
+    {
+        await using var db = NewDb();
+        var genre = new Genre { Name = "Action" };
+        db.Genres.Add(genre);
+        var work = new Work { MediaType = MediaType.Anime, CanonicalTitle = "x" };
+        db.Works.Add(work);
+        await db.SaveChangesAsync();
+        db.WorkGenres.Add(new WorkGenre { WorkId = work.Id, GenreId = genre.Id });
+        await db.SaveChangesAsync();
+
+        var data = new NormalizedWorkData { Source = ExternalIdSource.AniList };
+        data.Genres.Add("Action");
+
+        await new WorkMerger(db).ApplyAsync(work, new[] { data }, EnrichmentWriteMode.Overwrite);
+        await db.SaveChangesAsync();
+
+        Assert.Equal(1, await db.WorkGenres.CountAsync(wg => wg.WorkId == work.Id));
+    }
 }

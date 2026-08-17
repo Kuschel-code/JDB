@@ -9,8 +9,11 @@ namespace MetaHub.Jellyfin.Providers;
 /// Season metadata provider. Resolves the owning series through MetaHub and supplies a
 /// localized season name, so MetaHub can be selected under "Metadata downloaders (Seasons)".
 /// </summary>
-public class MetaHubSeasonProvider : IRemoteMetadataProvider<Season, SeasonInfo>
+public class MetaHubSeasonProvider : IRemoteMetadataProvider<Season, SeasonInfo>, IHasOrder
 {
+    // See MetaHubMovieProvider.Order for the reasoning.
+    public int Order => 40;
+
     private readonly IMetaHubBackend _backend;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly MetaHubItemGate _gate;

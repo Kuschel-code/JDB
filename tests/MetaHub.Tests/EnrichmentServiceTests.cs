@@ -91,6 +91,127 @@ public class EnrichmentServiceTests
     }
 
     [Fact]
+    public async Task An_internal_timeout_is_treated_as_a_miss_not_as_real_cancellation()
+    {
+        // HttpClient throws TaskCanceledException (an OperationCanceledException) on its own
+        // internal timeout, indistinguishable at the call site from the caller's token being
+        // cancelled. Passing a token that was never cancelled reproduces exactly that: the
+        // exception's *type* says "cancelled" but ct.IsCancellationRequested says otherwise, so
+        // this must fall through to the same per-provider miss path as any other failure —
+        // not rethrow and abort the rest of this work's enrichment.
+        var dbPath = Path.Combine(Path.GetTempPath(), $"metahub-enrich-timeout-{Guid.NewGuid():N}.db");
+        var sp = new ServiceCollection().AddMetaHubInfrastructureSqlite(dbPath).BuildServiceProvider();
+        try
+        {
+            sp.EnsureMetaHubSchemaCreated();
+            Guid workId;
+            using (var scope = sp.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+                var work = new Work { MediaType = MediaType.Anime, CanonicalTitle = "X" };
+                db.Works.Add(work);
+                await db.SaveChangesAsync();
+                workId = work.Id;
+            }
+
+            using (var scope = sp.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+                var providers = new IMetadataProvider[]
+                {
+                    new FakeProvider
+                    {
+                        Source = ExternalIdSource.Tmdb, Priority = 1,
+                        OnFetch = () => throw new TaskCanceledException("simulated HttpClient timeout")
+                    },
+                    new FakeProvider
+                    {
+                        Source = ExternalIdSource.AniList, Priority = 2,
+                        OnFetch = () => "{}",
+                        Parsed = new NormalizedWorkData { Source = ExternalIdSource.AniList, Overview = "Survived" }
+                    },
+                };
+
+                var svc = new EnrichmentService(db, providers,
+                    Options.Create(new EnrichmentOptions { WriteMode = EnrichmentWriteMode.Overwrite }),
+                    NullLogger<EnrichmentService>.Instance);
+
+                using var uncancelled = new CancellationTokenSource();
+                var result = await svc.EnrichAsync(workId, forceRefresh: false, writeMode: null, ct: uncancelled.Token);
+
+                // The throwing provider contributes nothing but must not stop AniList's data
+                // from being collected and applied — the same isolation an ordinary exception
+                // already gets, which is exactly the point: this must be treated as ordinary.
+                Assert.DoesNotContain("Tmdb", string.Join(",", result.Applied));
+                Assert.Contains("AniList", string.Join(",", result.Applied));
+            }
+
+            using (var scope = sp.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+                var work = await db.Works.FirstAsync(w => w.Id == workId);
+                Assert.Equal("Survived", work.Overview);
+            }
+        }
+        finally
+        {
+            sp.Dispose();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
+
+    [Fact]
+    public async Task A_real_cancellation_still_propagates()
+    {
+        var dbPath = Path.Combine(Path.GetTempPath(), $"metahub-enrich-cancel-{Guid.NewGuid():N}.db");
+        var sp = new ServiceCollection().AddMetaHubInfrastructureSqlite(dbPath).BuildServiceProvider();
+        try
+        {
+            sp.EnsureMetaHubSchemaCreated();
+            Guid workId;
+            using (var scope = sp.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+                var work = new Work { MediaType = MediaType.Anime, CanonicalTitle = "X" };
+                db.Works.Add(work);
+                await db.SaveChangesAsync();
+                workId = work.Id;
+            }
+
+            using (var scope = sp.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<MetaHubDbContext>();
+                using var cts = new CancellationTokenSource();
+                var providers = new IMetadataProvider[]
+                {
+                    new FakeProvider
+                    {
+                        Source = ExternalIdSource.Tmdb, Priority = 1,
+                        OnFetch = () =>
+                        {
+                            cts.Cancel();
+                            throw new OperationCanceledException(cts.Token);
+                        }
+                    },
+                };
+
+                var svc = new EnrichmentService(db, providers,
+                    Options.Create(new EnrichmentOptions()), NullLogger<EnrichmentService>.Instance);
+
+                await Assert.ThrowsAsync<OperationCanceledException>(
+                    () => svc.EnrichAsync(workId, forceRefresh: false, writeMode: null, ct: cts.Token));
+            }
+        }
+        finally
+        {
+            sp.Dispose();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
+
+    [Fact]
     public async Task A_rate_limited_provider_is_served_from_cache_even_on_a_forced_refresh()
     {
         // AniDB bans clients that re-fetch too often, so a provider declaring MinCacheTtl must
