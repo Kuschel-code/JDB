@@ -235,13 +235,23 @@ public class WorkMerger
             .ToListAsync(ct);
         var linkedIds = existingLinks.ToHashSet();
 
+        // Batched, like the equivalent people lookup in ApplyCreditsAsync just above — a
+        // per-genre round trip here runs on every enrichment (5-15 genres per work). Matched by
+        // lowercase, not the exact string: genre names are a small, all-ASCII English vocabulary
+        // (Action, Comedy, Sci-Fi, ...), so a plain .ToLower() (translated to SQL lower() on both
+        // providers) is enough to stop two providers reporting different casing for the same
+        // genre from producing two rows.
+        var lowerNames = names.Select(n => n.ToLower()).ToList();
+        var genresByName = (await _db.Genres.Where(g => lowerNames.Contains(g.Name.ToLower())).ToListAsync(ct))
+            .ToDictionary(g => g.Name, StringComparer.OrdinalIgnoreCase);
+
         foreach (var name in names)
         {
-            var genre = await _db.Genres.FirstOrDefaultAsync(g => g.Name == name, ct);
-            if (genre is null)
+            if (!genresByName.TryGetValue(name, out var genre))
             {
                 genre = new Genre { Name = name };
                 _db.Genres.Add(genre);
+                genresByName[name] = genre;
             }
 
             if (!linkedIds.Contains(genre.Id))

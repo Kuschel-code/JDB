@@ -74,6 +74,9 @@ public class MetaHubDbContext : DbContext
             if (useJsonb) tt.HasColumnType("jsonb");
             e.HasIndex(x => x.MediaType);
             e.HasIndex(x => x.CanonicalTitle);
+            // Serves EnrichmentRunner's Where(MediaType).OrderBy(UpdatedAt).Take(n) batch query
+            // with a single index scan instead of filtering MediaType then sorting every match.
+            e.HasIndex(x => new { x.MediaType, x.UpdatedAt });
         });
 
         b.Entity<ExternalId>(e =>
