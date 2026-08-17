@@ -26,7 +26,7 @@ public class EnrichmentOptions
     public EnrichmentWriteMode WriteMode { get; set; } = EnrichmentWriteMode.FillMissingOnly;
 
     /// <summary>Preferred language (BCP-47) used to boost matching artwork during scoring.</summary>
-    public string PreferredLanguage { get; set; } = "de";
+    public string PreferredLanguage { get; set; } = "en";
 
     /// <summary>Contact string used in the User-Agent for all providers.</summary>
     public string UserAgent { get; set; } = "MetaHub/0.1 (+https://github.com/kuschel-code/jdb)";
