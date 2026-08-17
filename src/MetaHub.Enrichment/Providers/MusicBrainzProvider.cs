@@ -6,15 +6,20 @@ namespace MetaHub.Enrichment.Providers;
 
 /// <summary>
 /// MusicBrainz provider for albums/releases (no key, but a descriptive User-Agent and ~1 req/s
-/// are required — handled by the HttpClient config and batch pacing).
+/// are required — enforced by <see cref="MusicBrainzRateLimiter"/> across every caller).
 /// </summary>
 public class MusicBrainzProvider : IMetadataProvider
 {
     public const string HttpClientName = "musicbrainz";
 
     private readonly IHttpClientFactory _factory;
+    private readonly MusicBrainzRateLimiter _rateLimiter;
 
-    public MusicBrainzProvider(IHttpClientFactory factory) => _factory = factory;
+    public MusicBrainzProvider(IHttpClientFactory factory, MusicBrainzRateLimiter rateLimiter)
+    {
+        _factory = factory;
+        _rateLimiter = rateLimiter;
+    }
 
     public ExternalIdSource Source => ExternalIdSource.MusicBrainz;
     public int Priority => 10;
@@ -24,6 +29,8 @@ public class MusicBrainzProvider : IMetadataProvider
 
     public async Task<string?> FetchRawAsync(Work work, string externalId, CancellationToken ct = default)
     {
+        await _rateLimiter.WaitAsync(ct);
+
         var url = $"https://musicbrainz.org/ws/2/release/{externalId}?fmt=json&inc=labels+recordings+media";
         var client = _factory.CreateClient(HttpClientName);
         var response = await client.GetAsync(url, ct);
