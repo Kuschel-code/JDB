@@ -13,8 +13,11 @@ namespace MetaHub.Jellyfin.Providers;
 /// API. Seasons fall back to the owning series' artwork (poster/backdrop), the common
 /// convention when no season-specific art exists.
 /// </summary>
-public class MetaHubImageProvider : IRemoteImageProvider
+public class MetaHubImageProvider : IRemoteImageProvider, IHasOrder
 {
+    // See MetaHubMovieProvider.Order for the reasoning; image fetchers use the same tie-break.
+    public int Order => 40;
+
     private readonly IMetaHubBackend _backend;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly MetaHubItemGate _gate;
@@ -28,23 +31,20 @@ public class MetaHubImageProvider : IRemoteImageProvider
 
     public string Name => "MetaHub";
 
-    public bool Supports(BaseItem item) => item is Series or Movie or Season or Episode;
+    // Episode stills are not stored yet (future: TMDB/AniDB episode images). Advertising
+    // Episode support here would list MetaHub as a selectable episode-image fetcher in
+    // Jellyfin's UI that silently returns nothing when chosen — worse than not offering it.
+    public bool Supports(BaseItem item) => item is Series or Movie or Season;
 
     public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => item switch
     {
         Season => new[] { ImageType.Primary, ImageType.Backdrop, ImageType.Thumb },
-        Episode => new[] { ImageType.Primary, ImageType.Thumb },
         _ => new[] { ImageType.Primary, ImageType.Backdrop, ImageType.Banner, ImageType.Logo, ImageType.Thumb }
     };
 
     public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
     {
         var config = Plugin.Instance!.Configuration;
-
-        // Episode stills are not stored yet (future: TMDB/AniDB episode images); MetaHub is
-        // listed under the episode image fetchers but currently supplies nothing for them.
-        if (item is Episode)
-            return Enumerable.Empty<RemoteImageInfo>();
 
         // Seasons have no provider ids of their own — use the owning series'.
         var providerIds = item is Season { Series: { } parent } ? parent.ProviderIds : item.ProviderIds;

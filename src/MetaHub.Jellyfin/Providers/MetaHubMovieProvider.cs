@@ -6,8 +6,14 @@ using MetaHub.Jellyfin.Api;
 namespace MetaHub.Jellyfin.Providers;
 
 /// <summary>Movie metadata provider, backed by the embedded engine or a remote API.</summary>
-public class MetaHubMovieProvider : IRemoteMetadataProvider<Movie, MovieInfo>
+public class MetaHubMovieProvider : IRemoteMetadataProvider<Movie, MovieInfo>, IHasOrder
 {
+    // Jellyfin falls back to this only for a library that has no explicit provider order set
+    // (its own admin-configured "Metadata downloaders" order always wins once set); providers
+    // without IHasOrder default to 50. A slightly lower value gives MetaHub's anime-aware
+    // matching a default edge over the unordered tier without being maximally aggressive.
+    public int Order => 40;
+
     private readonly IMetaHubBackend _backend;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly MetaHubItemGate _gate;

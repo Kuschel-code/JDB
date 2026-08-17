@@ -6,8 +6,11 @@ using MetaHub.Jellyfin.Api;
 namespace MetaHub.Jellyfin.Providers;
 
 /// <summary>Series/anime metadata provider, backed by the embedded engine or a remote API.</summary>
-public class MetaHubSeriesProvider : IRemoteMetadataProvider<Series, SeriesInfo>
+public class MetaHubSeriesProvider : IRemoteMetadataProvider<Series, SeriesInfo>, IHasOrder
 {
+    // See MetaHubMovieProvider.Order for the reasoning.
+    public int Order => 40;
+
     private readonly IMetaHubBackend _backend;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly MetaHubItemGate _gate;
