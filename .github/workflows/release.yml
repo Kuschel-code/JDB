@@ -29,10 +29,20 @@ jobs:
       - id: v
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            RAW="${{ inputs.version }}"
           else
-            echo "version=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            RAW="${{ github.ref_name }}"
           fi
+          # A manual "Run workflow" input can carry stray whitespace (a trailing space is easy
+          # to type without noticing). Trimmed here, once, so every downstream job sees a clean
+          # value — untrimmed, it reaches `dotnet publish -p:Version=...` in the plugin job
+          # verbatim and fails there with CS7034, after the 4 server builds already finished.
+          VERSION="$(echo "$RAW" | xargs)"
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "::error::Version '$VERSION' doesn't look like vX.Y.Z or vX.Y.Z.W (raw input: '$RAW')"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
   build:
     needs: setup
