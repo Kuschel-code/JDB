@@ -51,7 +51,10 @@ Additional:
 Primary:
 - **AniList** 🆓 — GraphQL, generous limits.
 - **Jikan** 🆓 — unofficial MAL API (scores, rankings).
-- **Kitsu** 🆓 — JSON:API.
+- **Kitsu** 🆓 — JSON:API. ⚠️ *Watch:* platform development has stalled (paid Pro tier
+  removed from the codebase in 2026); the API itself is still up (`kitsu.app/api/edge`,
+  ~99.8% uptime as of mid-2026) but unmaintained — no active roadmap. Fine to keep as a
+  low-priority fallback provider; don't expect new features or a fast fix if it breaks.
 - **AniDB** ⚠️ — very comprehensive; strict ToS, hard limits, client registration. Use defensively, cache hard.
 
 Additional:
