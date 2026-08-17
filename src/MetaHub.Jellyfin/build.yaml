@@ -1,7 +1,7 @@
 ---
 name: "MetaHub"
 guid: "a3f1c2d4-5b6e-47a8-9c0d-1e2f3a4b5c6d"
-version: "0.1.9.7"
+version: "0.1.9.8"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 owner: "kuschel-code"
@@ -14,6 +14,14 @@ category: "Metadata"
 artifacts:
   - "MetaHub.Jellyfin.dll"
 changelog: >
+  0.1.9.8 - Reliability and performance audit. A provider that timed out during a slow retry
+  could silently abort the rest of a work's enrichment, or (on-demand) the whole item's Jellyfin
+  refresh — fixed, plus AniDB's own throttle no longer risks extra requests from a generic retry
+  layer stacked on top, and MusicBrainz's documented ~1 req/s limit is now actually enforced.
+  Genre and anime-dataset ingest lookups that issued one database round trip per row now batch
+  them (most noticeable on a large library's enrichment and on dataset re-ingest). MetaHub's
+  metadata/image providers now declare an explicit order instead of an accidental one, and no
+  longer advertise episode artwork it doesn't supply.
   0.1.9.7 - The embedded database now decides on its own when it needs rebuilding: its schema
   version is derived from the data model instead of a number someone has to remember to raise.
   That omission is what broke 0.1.9.2 through 0.1.9.5, and it can no longer happen.
