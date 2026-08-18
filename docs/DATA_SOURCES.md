@@ -61,8 +61,27 @@ Additional:
 - **AnimeThemes.moe** 🆓 — opening/ending themes, audio/video.
 - **AnimeNewsNetwork (Encyclopedia API)** 🆓 — staff, companies, detailed credits.
 - **TheTVDB / TMDB (via Fribb mapping)** — artwork + episode data Jellyfin expects.
-- **anisearch.com**, **LiveChart.me**, **Notify.moe**, **anime-planet.com** — already
-  carried as cross-IDs by manami; useful as additional enrichment targets.
+- **LiveChart.me**, **Notify.moe**, **anime-planet.com** — already carried as cross-IDs
+  by manami; useful as additional enrichment targets.
+- **anisearch.com / anisearch.de** ⚠️ — investigated in depth on request (verified against
+  the official `jellyfin/jellyfin-plugin-anisearch` source, and the full commit history of
+  `Nihilate/Roboragi`, not just search snippets). **No usable public read API exists.**
+  aniSearch is one shared database across the `.com`/`.de`/etc. domains (titles confirmed
+  in DE/EN/JA on the same page; FR/IT/ES claimed since 2021 but unverified as real
+  translated data vs. UI chrome). The description/synopsis field the *only* existing
+  integration (Jellyfin's own aniSearch plugin) extracts is specifically German
+  (`id="desc-de"`) — genuinely useful for the translation gap noted above, but only reachable
+  by **scraping the HTML page**, which is exactly what that plugin does, and its own issue
+  tracker documents IP bans from it. A token-gated `www.anisearch.com/api/v1/roboragi/...`
+  endpoint was proposed in a 2018 GitHub issue and aniSearch's team offered access for it,
+  but it was never implemented by anyone — no code, no response schema, possibly not even
+  live anymore. The only other route is emailing `api@anisearch.com` to request project-
+  specific API access (same pattern as Annict); response schema and terms unknown until
+  granted, and even then a redistribution-to-third-parties clause noted elsewhere needs a
+  careful read for a self-hosted-and-served-via-Jellyfin use case. **Not implemented**:
+  the only currently-working integration method is scraping, which contradicts this
+  project's official-APIs-only rule and has a documented ban risk. Revisit if a maintainer
+  requests and receives real API access.
 - **Shikimori** ⚠️ — Russian/EN anime/manga DB with rich relations.
 
 Japanese sources (native titles, Japanese episode data):
