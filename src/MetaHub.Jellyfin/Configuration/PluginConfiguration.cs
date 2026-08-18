@@ -45,7 +45,7 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public string[] LibraryTypeOverrides { get; set; } = System.Array.Empty<string>();
 
-    public string PreferredLanguage { get; set; } = "de";
+    public string PreferredLanguage { get; set; } = "en";
     public string FallbackLanguage { get; set; } = "en";
 
     /// <summary>
