@@ -3,7 +3,11 @@
 Durable context for future sessions. This is the project's "brain": what it is, how it's
 built, decisions made, gotchas, and what's left. Update it as the project evolves.
 
-_Last updated: 2026-06-23 · current release: v0.1.8.2_
+_Last updated: 2026-08-20 · current release: v0.1.9.8_
+
+`CLAUDE.md` in the repo root is the short version Claude loads every session (commands,
+gotchas, conventions). This file is the long-form memory behind it — keep both in sync
+when a fact here changes.
 
 ## What this is
 
@@ -42,8 +46,11 @@ docs/                       CONCEPT.md, CONFIGURATION.md, DATA_SOURCES.md, BRAIN
   A net8/10.10 plugin is **invisible in the 10.11 catalog** (ABI mismatch). targetAbi
   `10.11.0.0`, framework `net9.0`. EF Core / Microsoft.Extensions aligned to **9.0.11**
   (matches Jellyfin's stack); Npgsql EF provider stays 9.0.4 (latest, compatible).
-- **This sandbox has only .NET 8 + .NET 10 SDKs** (no .NET 9). Build/test with
-  `DOTNET_ROLL_FORWARD=Major` so net9 runs on the .NET 10 runtime.
+- **Claude Code cloud sessions have no .NET SDK at all** — `dotnet` is not on PATH
+  (verified 2026-08-20). You cannot build or test from one; **CI is the only gate**, so
+  push the branch and read the `build-test` job instead of trying to compile locally.
+  On a machine that has only .NET 8/10 installed, set `DOTNET_ROLL_FORWARD=Major` so
+  net9 runs on the .NET 10 runtime.
 - **Plugin zip bundle list** (Jellyfin provides EF Core/SQLite/Microsoft.Extensions, so we
   only ship what it doesn't): `MetaHub.*.dll`, `Npgsql.dll`,
   `Npgsql.EntityFrameworkCore.PostgreSQL.dll`, `Polly.dll`, `Polly.Extensions.Http.dll`,
@@ -51,11 +58,21 @@ docs/                       CONCEPT.md, CONFIGURATION.md, DATA_SOURCES.md, BRAIN
   (DI/Logging/Options/EF) breaks the plugin — never bundle those.
 - **Releases:** push a version tag — `git tag vX.Y.Z && git push origin vX.Y.Z` — and the
   Release workflow (`on: push: tags: v*`) builds the zips + plugin, creates the GitHub release,
-  and updates `manifest.json` on `main`. This is how every release (v0.1.7.x–v0.1.8.2) was cut;
+  and updates `manifest.json` on `main`. This is how every release (v0.1.7.x–v0.1.9.8) was cut;
   it needs only push access. (The manual **Actions → Run workflow** button needs `actions: write`,
   which the integration token lacks — but the tag-push path does not, so prefer it.)
 - **Plugin install link (stable):**
   `https://raw.githubusercontent.com/Kuschel-code/JDB/main/manifest.json`
+- **`manifest.json` belongs to the release workflow, not to you.** It computes the real
+  MD5 and prepends the entry when the tag is cut. A hand-added entry carries an empty
+  checksum and a dead `sourceUrl` and breaks installation for everyone on the repo feed
+  until the tag lands (learned the hard way at v0.1.9.2). Bump the version and write the
+  changelog in `src/MetaHub.Jellyfin/build.yaml` instead.
+- **Entity change = schema change in both modes.** Since v0.1.9.7 the embedded SQLite
+  schema version derives itself from the model, so it can no longer be forgotten; but
+  PostgreSQL still needs a real EF migration **plus** a regenerated snapshot. Shipping the
+  model change without the migration is exactly what broke v0.1.9.2–v0.1.9.5
+  (`no such column` on every existing database).
 - **SQLite gotcha:** can't `ORDER BY DateTimeOffset` — already handled; mirror any Replace
   chains between C# (`NormTitle`) and EF queries or fuzzy matching breaks.
 
@@ -97,6 +114,32 @@ docs/                       CONCEPT.md, CONFIGURATION.md, DATA_SOURCES.md, BRAIN
   so Jellyfin can show the viewer's-language name instead of romaji.
 - **"Apply metadata to library" task** (v0.1.8.0): pushes MetaHub titles/data onto existing
   library items (beyond Jellyfin's own refresh).
+- **Name matching, finished** (v0.1.8.3–v0.1.8.8): synonyms/alternate titles are indexed and
+  searched; bracketed titles match across `[…]`/`(…)`/none; anime films and OVAs resolve by
+  folder name (no truncation at `I.`/`II.`, `Movie:` prefix tolerated, media type taken from
+  the library name); a sequel whose only marker lives in a synonym ("Saiki K. Reawakened")
+  no longer collapses onto the base season. Folder matches now trigger on-demand enrichment
+  just like id matches.
+- **More sources** (v0.1.8.7–v0.1.9.0): Kitsu (no key), fanart.tv (optional free key —
+  posters, backgrounds, clear logos, language-aware), Shikimori (no key), plus five more
+  anime cross-ids (AniSearch, Notify, LiveChart, Annict, Syobocal). TMDB is fetched in the
+  configured language. Genres and studios are written onto the Jellyfin item. Every source
+  has its own on/off toggle in the settings **Sources** section.
+- **AniDB HTTP provider, phase 1** (v0.1.9.2–v0.1.9.6): titles, episodes, characters and
+  artwork from the HTTP anime endpoint (gzip XML, rate-limited, ban-safe, 10 MB cap,
+  oversized responses rejected rather than cached truncated). Episode sync stores AniDB
+  episode id, kind (Regular/Special/Credit/Trailer/Parody) and raw episode number; work
+  status is derived from air dates and drives the refresh TTL. `SearchTitles` is enriched
+  with provider title translations after each merge, so name matching improves every run.
+- **Audit hardening** (v0.1.8.4, v0.1.9.1, v0.1.9.7, v0.1.9.8): WAL + `busy_timeout` and
+  soft-failing reads (concurrent scans no longer drop metadata with "database is locked");
+  one provider's failure no longer aborts a work's whole enrichment, and a timing-out
+  provider no longer aborts an on-demand Jellyfin refresh; payloads are cached even when
+  every parse fails, so the next run doesn't re-hit rate limits; TMDB/fanart.tv/Google Books
+  no longer log their API key; ED2K exact-multiple files append the empty trailing chunk
+  (matches AniDB's canonical hash); AniDB UDP re-auths on 501/502/506 and backs off on 555;
+  the standalone API gates on `X-Api-Key` when `MetaHub:ApiKey` is set; MusicBrainz's ~1 req/s
+  limit is actually enforced; per-row genre/dataset lookups are batched.
 
 ## Known limitations / TODO
 
@@ -112,6 +155,17 @@ docs/                       CONCEPT.md, CONFIGURATION.md, DATA_SOURCES.md, BRAIN
 - **Music identification (AcoustID/Chromaprint/fpcalc)** not implemented (M6 left it as a
   parser/provider; no fingerprinting yet).
 - Remote-mode title lookup endpoint not exposed (ResolveByNameAsync is embedded-only).
+- **Overview language**: `PreferredLanguage` defaults to English since v0.1.9.8. Season names
+  localize, **descriptions still don't** — `OverviewTranslations` is not filled by any
+  provider that has translated synopses. This is the open translation gap; see
+  `docs/DATA_SOURCES.md` § *Translation coverage*.
+- **Source candidates investigated and rejected** (don't re-research these):
+  *aniSearch* — no usable public read API; the only working method is HTML scraping, which
+  its own integration's issue tracker documents getting IP-banned for.
+  *Bangumi / Douban and other Chinese sources* — deprioritized: PRC content moderation is a
+  real accuracy risk for something whose job is to be canonical.
+  *Kitsu* — kept as a low-priority fallback, but platform development has stalled (no
+  roadmap since 2026); don't expect a fast fix if it breaks.
 
 ## Release checklist
 
@@ -134,4 +188,10 @@ docs/                       CONCEPT.md, CONFIGURATION.md, DATA_SOURCES.md, BRAIN
 - Cast & crew end to end.
 - Title/folder-name + library-aware fuzzy matching; posters at ingest; project logo.
 - Language-aware titles (TitleTranslations); "Apply metadata to library" task.
-- Released through v0.1.8.2.
+- Name matching completed (synonyms, brackets, films/OVAs, sequel markers) — v0.1.8.3–v0.1.8.8.
+- Kitsu / fanart.tv / Shikimori providers, per-source toggles, TMDB language — v0.1.8.7–v0.1.9.0.
+- AniDB HTTP provider phase 1 + the schema-migration lesson — v0.1.9.2–v0.1.9.7.
+- Reliability/performance audit + provider ordering — v0.1.9.8.
+- Source research filed in DATA_SOURCES.md: aniSearch (no API), regional China/Korea/Japan
+  connections (China deprioritized), Kitsu's stalled development, the translation gap.
+- Released through v0.1.9.8. Test suite: 180 tests across 41 files.
