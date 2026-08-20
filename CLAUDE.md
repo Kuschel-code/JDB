@@ -13,10 +13,15 @@ dotnet build   MetaHub.sln -c Release          # needs the .NET 9 SDK — see be
 dotnet test    MetaHub.sln -c Release          # 180 tests across 41 files
 ```
 
-**Claude Code cloud sessions have no .NET SDK at all** (`dotnet: command not found`) —
-you cannot build or test here, so don't burn turns trying. Verify through CI: push the
-branch and read the `build-test` job. Locally, if only .NET 8/10 are installed, set
-`DOTNET_ROLL_FORWARD=Major` so `net9.0` runs on the .NET 10 runtime.
+**Cloud containers ship without a .NET SDK.** `.claude/hooks/session-start.sh` installs
+.NET 9 at session start and warms the NuGet cache — but it can only succeed if the
+environment's network policy allows the Microsoft download hosts. As of 2026-08-20 this
+environment answers **403 for `builds.dotnet.microsoft.com`** (`api.nuget.org` is allowed),
+so the hook reports the block and the session runs without an SDK.
+
+If `dotnet` is missing, **don't burn turns trying to install it** — verify through CI:
+push the branch and read the `build-test` job. Locally, if only .NET 8/10 are installed,
+set `DOTNET_ROLL_FORWARD=Major` so `net9.0` runs on the .NET 10 runtime.
 
 ## Layout
 
