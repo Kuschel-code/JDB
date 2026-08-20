@@ -154,3 +154,139 @@ gesamter Kontext erneut gelesen. Eine Allowlist für die üblichen Read-only-Bef
 
 H1 bis H3 kosten nichts außer einer Umstellung der Gewohnheit und adressieren zusammen
 den weitaus größten Teil der gemessenen 36 Mio. Tokens pro Session.
+
+---
+
+## 4. Skills: was kann weg? (Nachtrag, recherchiert 2026-08-20)
+
+Du arbeitest von iOS über Claude Code on the web — das sind **Cloud-Sessions**. Die lesen
+laut Doku *nicht* `~/.claude/skills/` deiner Maschine, sondern **exakt die Skills, die für
+dein claude.ai-Konto aktiviert sind** (plus Projekt-Skills aus `.claude/skills/` im
+geklonten Repo). Aktiviert sind zehn:
+
+`morning` · `learn` · `skill-creator` · `mcp-builder` · `canvas-design` ·
+`algorithmic-art` · `xlsx` · `pptx` · `pdf` · `docx`
+
+Für ein .NET/Jellyfin-Repo ist davon **keiner** einschlägig.
+
+### Was das Abschalten wirklich bringt
+
+Zwei getrennte Kostenposten, und das ist der Punkt:
+
+**a) Listing-Kosten** — pro Skill landen nur Name + Beschreibung im Kontext, und die sind
+laut Doku **hart auf 1.536 Zeichen gedeckelt**. Gemessen für alle elf Skill-Dateien auf
+der Platte: **5.763 Zeichen ≈ 1.558 Tokens**.
+
+| Bezug | Anteil |
+|---|---:|
+| an der gemessenen Start-Baseline (46.954 Tokens) | 3,3 % |
+| am Ø-Sessionverbrauch (36,0 Mio. Tokens) | **0,65 %** |
+
+**b) Fehlzündungs-Kosten** — das ist der reale Posten. Löst ein Skill aus, wird sein
+kompletter Body geladen, und der *bleibt* laut Doku für den Rest der Session im Kontext
+("every line is a recurring token cost"), wird also bei jedem Folge-Turn erneut gelesen:
+
+| Skill (Body) | ~Tokens | 50 Turns | 150 Turns | 300 Turns |
+|---|---:|---:|---:|---:|
+| skill-creator | 9.014 | $0,23 | $0,68 | $1,35 |
+| pptx | 5.621 | $0,14 | $0,42 | $0,84 |
+| algorithmic-art | 5.452 | $0,14 | $0,41 | $0,82 |
+| morning | 4.909 | $0,12 | $0,37 | $0,74 |
+| learn | 3.635 | $0,09 | $0,27 | $0,55 |
+| canvas-design | 3.262 | $0,08 | $0,24 | $0,49 |
+
+Realistisches Risiko im Coding-Alltag hat davon fast nur **`learn`** — es triggert auf
+"erklär mir", "wie funktioniert X", "walk me through". Das sagt man beim Programmieren
+oft. (Die Beschreibung schließt Coding-Tasks explizit aus, aber die Grenze ist weich.)
+
+### Verdikt
+
+**Skills abschalten ist Kosmetik.** Alle zehn zu deaktivieren spart ~1.558 Tokens Listing
+plus gelegentliche Fehlzündungen — zusammen unter 1 % einer Session. Gemessen an den
+96,8 % Cache-Read-Anteil ist das Rundungsfehler. Mach es, weil es aufräumt, nicht weil es
+spart.
+
+**Und wenn, dann ohne Wertverlust:** Skills nicht löschen, sondern nur das automatische
+Auslösen abstellen — dann bleiben sie per `/skillname` tippbar:
+
+- claude.ai-Skills: auf claude.ai bzw. Desktop → **Customize** abschalten (Löschen des
+  Ordners bringt nichts, der nächste Sync lädt sie zurück).
+- Beliebiger Skill, ohne ihn zu verlieren: `disable-model-invocation: true` im Frontmatter
+  oder `"user-invocable-only"` in `skillOverrides` in `.claude/settings.json`.
+- `paths`-Frontmatter beschränkt einen Skill auf passende Datei-Globs.
+- Alle gebündelten Skills: `disableBundledSkills: true` (lässt nur `/doctor`).
+
+## 5. Nullverlust-Hebel aus den offiziellen Docs
+
+Sortiert nach Wirkung. Alles hier kostet keine Qualität — es entfernt nur Ballast.
+
+### Erst messen, statt raten
+- **`/usage`** zeigt auf Pro/Max/Team eine **Attribution nach Skills, Subagenten, Plugins
+  und einzelnen MCP-Servern in Prozent** — plus "Behavior Flags", die anschlagen, wenn
+  z. B. *long context* oder *cache misses* über 10 % deines Verbrauchs ausmachen.
+  `d`/`w` schaltet zwischen 24 h und 7 Tagen. Das beantwortet die Frage "welcher Skill
+  kostet mich was" belastbar, statt sie zu schätzen.
+- **`/context`** zeigt die Aufteilung: System-Prompt, Tools, Memory-Dateien, Skills, Verlauf.
+- **`/insights`** schreibt einen HTML-Report über die letzten Sessions nach
+  `~/.claude/usage-data/report.html`.
+
+### Kontext klein halten
+- **`/clear` kostet nichts, `/compact` ist teuer** — `/compact` liest den gesamten Verlauf,
+  den es zusammenfasst, ist also selbst eine große Anfrage. Bei unabhängigen Aufgaben
+  immer `/clear` (vorher `/rename`, später `/resume`).
+- **`/btw` für Nebenfragen** — die Antwort landet **nie** im Gesprächsverlauf. Reiner
+  Gewinn für alles, was du nur kurz wissen willst.
+- **`/rewind` → "Summarize up to here"** verdichtet nur den vorderen Teil und lässt das
+  Aktuelle vollständig stehen.
+
+### Cache-Misses vermeiden (betrifft dich konkret)
+Die Cache-Lebensdauer ist **1 Stunde im Abo** und fällt auf **5 Minuten**, sobald
+Usage-Credits gezogen werden. Die erste Nachricht nach einer längeren Pause **verarbeitet
+den kompletten Kontext neu — zum vollen Preis**, nicht zum Cache-Tarif.
+Das erklärt die **337.234 ungecachten Input-Tokens** in deiner JDB-Session, die über sieben
+Wochen immer wieder aufgeweckt wurde. Gegenmittel: Sessions nicht über Tage offenhalten,
+und `ENABLE_PROMPT_CACHING_1H=1` setzen, wenn Credits im Spiel sind.
+
+### Stiller Verbrauch im Leerlauf
+Diese Dinge senden **den vollen Kontext, auch wenn die Session nur rumliegt**:
+Scheduled Tasks, Cross-Session-Messages und Goal-Check-ins.
+→ `crossSessionInbound: "hold"` in den Settings, `CLAUDE_CODE_GOAL_CHECKIN_MINUTES=0`.
+In `session_01UZL4S8…` war ein `goal` gesetzt; mehrere deiner Sessions standen wochenlang
+offen. Das läuft auf der Uhr mit, ohne dass du etwas tust.
+
+### Ausgaben filtern, bevor sie in den Kontext kommen
+Ein **PreToolUse-Hook** kann Tool-Ausgaben vorverarbeiten — das offizielle Beispiel filtert
+Testläufe auf Failures und reduziert "tens of thousands of tokens to hundreds".
+Für dieses Repo direkt anwendbar: die CI ruft `dotnet test --verbosity normal` auf; du
+willst davon in der Session ohnehin nur die Fehlschläge sehen. Null Informationsverlust.
+
+### Code-Intelligence-Plugin für C#
+Laut Doku ersetzt ein einzelner "go to definition"-Aufruf ein `grep` plus das Lesen
+mehrerer Kandidatendateien; installierte Language-Server melden Typfehler nach Edits
+automatisch. Bei 151 `.cs`-Dateien ist das nicht nur billiger, sondern besser.
+
+### Subagenten — Präzisierung zu H5
+Beides stimmt gleichzeitig: Subagenten kosten **mehr Gesamt-Tokens** (bei dir gemessen
+1,7–2,2×), halten aber den **Hauptkontext sauber**. Die Rechnung entscheidet die Sessionlänge:
+
+| Variante | Hauptkontext wächst um | Kosten über 100 Folge-Turns |
+|---|---:|---:|
+| 50k Tokens Recherche direkt im Hauptthread | 50.000 | $2,50 |
+| dieselbe Recherche im Subagenten, 2k Zusammenfassung zurück | 2.000 | $0,10 + einmalig der Subagent |
+
+→ Subagent lohnt für **lesende Recherche in langen Sessions**, nicht für kurze Aufgaben und
+nicht als Standard-Arbeitsweise. Agent-Teams liegen laut Doku bei **~7× Tokens** einer
+normalen Session (sind per Default aus — dabei lassen).
+
+### Einordnung deiner Zahlen
+Die Doku nennt als Erfahrungswert **~$13 pro Entwickler und aktivem Tag**, **$150–250 pro
+Monat**, und **unter $30 pro aktivem Tag bei 90 % der Nutzer**.
+Deine Sessions liegen bei **Ø $21,65–34,36 pro Session**, die teuerste einzelne bei
+**$56,17** — also etwa beim Doppelten dessen, was bei 90 % der Nutzer ein ganzer aktiver
+Tag kostet. Das Problem ist nicht, wie viel du arbeitest, sondern dass der Kontext
+mitwächst und bei jedem Turn erneut bezahlt wird.
+
+### Quellen
+- [Best practices for Claude Code](https://code.claude.com/docs/en/best-practices)
+- [Manage costs effectively](https://code.claude.com/docs/en/costs)
+- [Extend Claude with skills](https://code.claude.com/docs/en/skills)
