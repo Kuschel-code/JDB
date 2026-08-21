@@ -13,6 +13,14 @@ set -euo pipefail
 [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] || exit 0
 
 DOTNET_CHANNEL="9.0"
+
+# Prefer an SDK the environment's setup script already provisioned (that one lives in the
+# cached filesystem snapshot; anything this hook installs does not, because the snapshot is
+# taken before SessionStart hooks run). Fall back to a per-user install under $HOME.
+if [ -z "${DOTNET_ROOT:-}" ] && command -v dotnet >/dev/null 2>&1; then
+    _dotnet_bin="$(readlink -f "$(command -v dotnet)")"
+    DOTNET_ROOT="$(dirname "$_dotnet_bin")"
+fi
 export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 export PATH="$DOTNET_ROOT:$DOTNET_ROOT/tools:$PATH"
 export DOTNET_CLI_TELEMETRY_OPTOUT=1

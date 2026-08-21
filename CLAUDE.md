@@ -13,11 +13,17 @@ dotnet build   MetaHub.sln -c Release          # needs the .NET 9 SDK — see be
 dotnet test    MetaHub.sln -c Release          # 180 tests across 41 files
 ```
 
-**Cloud containers ship without a .NET SDK.** `.claude/hooks/session-start.sh` installs
-.NET 9 at session start and warms the NuGet cache — but it can only succeed if the
-environment's network policy allows the Microsoft download hosts. As of 2026-08-20 this
-environment answers **403 for `builds.dotnet.microsoft.com`** (`api.nuget.org` is allowed),
-so the hook reports the block and the session runs without an SDK.
+**Cloud containers ship without a .NET SDK.** The SDK belongs in the cloud environment's
+**setup script** — that runs before Claude Code launches and its filesystem is snapshotted,
+so later sessions start with it already installed. `.claude/hooks/session-start.sh` uses
+that SDK when it finds one, installs a per-user copy when it doesn't, and warms the NuGet
+cache either way.
+
+Both need the environment's network policy to allow the Microsoft download hosts. As of
+2026-08-20 this environment answers **403 for `builds.dotnet.microsoft.com`** — the Trusted
+list contains `dotnet.microsoft.com` but without a `*.` prefix, so the subdomain
+`dot.net` redirects to is not covered (`api.nuget.org` is allowed). Until the policy lists
+`*.dotnet.microsoft.com`, sessions run without an SDK and the hook says so.
 
 If `dotnet` is missing, **don't burn turns trying to install it** — verify through CI:
 push the branch and read the `build-test` job. Locally, if only .NET 8/10 are installed,
