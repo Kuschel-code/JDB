@@ -9,9 +9,19 @@ Depth lives in `docs/BRAIN.md` (architecture, decisions, session history) and
 ## Commands
 
 ```bash
-dotnet build   MetaHub.sln -c Release          # needs the .NET 9 SDK — see below
-dotnet test    MetaHub.sln -c Release          # 180 tests across 41 files
+dotnet build MetaHub.sln -c Release            # 1 pre-existing warning, see below
+dotnet test  MetaHub.sln -c Release            # 259 tests, all green
 ```
+
+Two results that are **pre-existing, not something you broke**:
+
+- The Release build emits one `EF1002` warning
+  (`src/MetaHub.Infrastructure/DependencyInjection.cs:80`, `ExecuteSqlRaw`). CI treats it
+  as a warning, not an error.
+- `dotnet format MetaHub.sln --verify-no-changes` reports **~183 whitespace deviations**
+  across `tests/` and `src/MetaHub.Jellyfin/`. Formatting has never been enforced — CI does
+  not run `format` — so a wholesale reformat would be a large, unrelated diff. Don't fix
+  them as a side effect of another change.
 
 **Cloud containers ship without a .NET SDK.** The SDK belongs in the cloud environment's
 **setup script** — that runs before Claude Code launches and its filesystem is snapshotted,
