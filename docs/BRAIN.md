@@ -46,11 +46,14 @@ docs/                       CONCEPT.md, CONFIGURATION.md, DATA_SOURCES.md, BRAIN
   A net8/10.10 plugin is **invisible in the 10.11 catalog** (ABI mismatch). targetAbi
   `10.11.0.0`, framework `net9.0`. EF Core / Microsoft.Extensions aligned to **9.0.11**
   (matches Jellyfin's stack); Npgsql EF provider stays 9.0.4 (latest, compatible).
-- **Claude Code cloud sessions have no .NET SDK at all** — `dotnet` is not on PATH
-  (verified 2026-08-20). You cannot build or test from one; **CI is the only gate**, so
-  push the branch and read the `build-test` job instead of trying to compile locally.
-  On a machine that has only .NET 8/10 installed, set `DOTNET_ROLL_FORWARD=Major` so
-  net9 runs on the .NET 10 runtime.
+- **Cloud containers ship without a .NET SDK**, so the environment's **setup script**
+  installs it (that runs before Claude Code and its filesystem is cached, unlike a
+  SessionStart hook). This needs the environment's network policy to allow
+  `*.dotnet.microsoft.com` — the Trusted list has `dotnet.microsoft.com` without a `*.`
+  prefix, so `builds.dotnet.microsoft.com`, where `dot.net` redirects, is not covered.
+  With that allowed, `dotnet build` and `dotnet test` work from a cloud session
+  (verified 2026-08-21, SDK 9.0.317). Without it, CI is the only gate. On a machine that
+  has only .NET 8/10 installed, set `DOTNET_ROLL_FORWARD=Major` so net9 runs on .NET 10.
 - **Plugin zip bundle list** (Jellyfin provides EF Core/SQLite/Microsoft.Extensions, so we
   only ship what it doesn't): `MetaHub.*.dll`, `Npgsql.dll`,
   `Npgsql.EntityFrameworkCore.PostgreSQL.dll`, `Polly.dll`, `Polly.Extensions.Http.dll`,
@@ -194,4 +197,6 @@ docs/                       CONCEPT.md, CONFIGURATION.md, DATA_SOURCES.md, BRAIN
 - Reliability/performance audit + provider ordering — v0.1.9.8.
 - Source research filed in DATA_SOURCES.md: aniSearch (no API), regional China/Korea/Japan
   connections (China deprioritized), Kitsu's stalled development, the translation gap.
-- Released through v0.1.9.8. Test suite: 180 tests across 41 files.
+- Released through v0.1.9.8. Test suite: **259 tests, all green** (41 files; the 180 figure
+  in earlier notes counted `[Fact]`/`[Theory]` attributes and missed the `[InlineData]`
+  cases). Verified 2026-08-21 on a cloud session with the SDK installed.
