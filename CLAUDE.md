@@ -87,6 +87,17 @@ picks per call. Almost every bug that reached users was embedded-only.
 - The embedded DB is a **rebuildable cache**, not user data. Wiping and rebuilding it on a
   schema change is the intended behaviour, not a fallback.
 
+## Subagents
+
+Two live in `.claude/agents/`, both pinned to a cheaper model than the session:
+
+- **`explorer`** (Haiku) — read-only sweeps across the tree. Use it when the answer needs
+  many files but only the conclusion matters; it returns `file:line` pointers, so the
+  reading cost stays in its context instead of yours for the rest of the session.
+- **`plugin-reviewer`** (Sonnet) — reviews a diff against this repo's actual bug history
+  (missing migration, hand-edited manifest, bundled host assemblies, embedded-vs-standalone
+  divergence). Worth running before a release tag.
+
 ## Verifying a change
 
 CI (`.github/workflows/ci.yml`) restores, builds Release and runs the full test suite on
