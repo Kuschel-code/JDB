@@ -21,6 +21,16 @@
         #metaHubPage .mhCard h3 { margin: 0 0 1.1em; font-size: .8em; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; opacity: .65; }
         #metaHubPage .mhCard .fieldDescription { line-height: 1.5; }
         #metaHubPage .mhChecks { display: flex; flex-wrap: wrap; column-gap: 2.5em; }
+
+        /* Collapsible help — keeps a reference-heavy card scannable. */
+        #metaHubPage .mhDetails { margin-top: 1.2em; border-top: 1px solid var(--mh-line); padding-top: .9em; }
+        #metaHubPage .mhDetails > summary { cursor: pointer; font-size: .92em; opacity: .7; list-style: none; user-select: none; }
+        #metaHubPage .mhDetails > summary::-webkit-details-marker { display: none; }
+        #metaHubPage .mhDetails > summary::before { content: '\25B8'; display: inline-block; width: 1.1em; transition: transform .15s; }
+        #metaHubPage .mhDetails[open] > summary::before { transform: rotate(90deg); }
+        #metaHubPage .mhDetails > summary:hover { opacity: 1; }
+        #metaHubPage .mhDetails .fieldDescription { margin-top: .8em; }
+        #metaHubPage .mhModeHint { min-height: 1.2em; }
         #metaHubPage .mhChecks .checkboxContainer { flex: 1 1 9em; }
 
         /* Library list — one continuous divided list with hover, not separate boxed cards. */
@@ -252,31 +262,51 @@
 
                     <div class="mhCard">
                         <h3>Your own databases</h3>
-                        <div class="fieldDescription" style="margin-bottom:.8em;">
-                            Add metadata databases you host yourself &mdash; a folder of files, or your own
-                            HTTP endpoint. They are matched by title and merged like any other source.
+                        <div class="fieldDescription" style="margin-bottom:1.1em;">
+                            Metadata databases you host yourself &mdash; a folder of files, or your own HTTP
+                            endpoint. They are matched by title, so no provider IDs are needed.
                         </div>
+
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="CustomSources">Sources (one per line)</label>
-                            <textarea id="CustomSources" is="emby-textarea" rows="4"
-                                      placeholder="My NAS | /mnt/nas/metadata&#10;Home API | https://meta.lan/metahub | 3 | secret"></textarea>
+                            <label class="inputLabel inputLabelUnfocused" for="CustomSources">Sources &mdash; one per line</label>
+                            <textarea id="CustomSources" is="emby-textarea" rows="3"
+                                      placeholder="My NAS | /mnt/nas/metadata&#10;Home API | https://meta.lan/metahub"></textarea>
                             <div class="fieldDescription">
-                                Format: <code>Name | Location | Priority | ApiKey</code> &mdash; only the location is
-                                required. A location starting with <code>http://</code> or <code>https://</code> is
-                                queried as an endpoint, anything else is read as a folder. Use an absolute path
-                                (<code>/mnt/nas/metadata</code>, <code>D:\Metadata</code>); relative paths are ignored.
+                                <code>Name | Location | Priority | ApiKey</code> &mdash; only the location is
+                                required and it must be absolute. Starting with <code>http://</code> or
+                                <code>https://</code> makes it an endpoint, anything else is read as a folder.
                             </div>
                         </div>
-                        <div class="fieldDescription">
-                            <b>Folder layout:</b> one subfolder per title (or a file named after it), holding
-                            <code>metahub.json</code> or an <code>.nfo</code> file. Artwork such as
-                            <code>poster.jpg</code> next to it is picked up automatically. Folder names are matched
-                            ignoring case and punctuation.
-                            <br /><b>Endpoint:</b> receives <code>?title=&amp;year=&amp;type=</code> plus any known
-                            IDs and answers with the same JSON; the key is sent as the <code>X-Api-Key</code> header.
-                            <br /><b>Priority:</b> lower wins. The built-in sources sit at 10&ndash;30, so the
-                            default of 5 lets your own data win. Changes apply after a Jellyfin restart.
+
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="CustomSourceMode">When sources disagree</label>
+                            <select is="emby-select" id="CustomSourceMode">
+                                <option value="Prefer">Prefer my database</option>
+                                <option value="Fallback">Only fill what the others miss</option>
+                                <option value="Auto">Auto &mdash; decide per entry</option>
+                            </select>
+                            <div class="fieldDescription mhModeHint" id="CustomSourceModeHint"></div>
                         </div>
+
+                        <details class="mhDetails">
+                            <summary>Folder layout, file format and endpoint</summary>
+                            <div class="fieldDescription">
+                                <b>Folder</b> &mdash; one subfolder per title (or a file named after it) holding
+                                <code>metahub.json</code> or an <code>.nfo</code>. Kodi/Jellyfin NFO sidecars are read
+                                as they are. Artwork next to it (<code>poster.jpg</code>, <code>fanart.jpg</code>) is
+                                picked up automatically, and folder names match ignoring case and punctuation.
+                                <br /><br />
+                                <b>Endpoint</b> &mdash; receives <code>?title=&amp;type=&amp;year=</code> plus every
+                                known ID and answers with the same JSON; the key is sent as
+                                <code>X-Api-Key</code>. Answer <code>404</code> for titles you do not have.
+                                <br /><br />
+                                <b>Priority</b> (optional, per line) &mdash; lower wins and overrides the setting
+                                above for that one source. The built-in sources sit at 10&ndash;30.
+                                <br /><br />
+                                The full JSON field list is in the project README. Changes take effect after a
+                                Jellyfin restart.
+                            </div>
+                        </details>
                     </div>
 
                     <div class="mhCard">
@@ -351,7 +381,7 @@
             var page, config, disabled, overrides, saveTimer;
 
             var checks = ['UseEmbeddedEngine','EnableMovies','EnableSeries','EnableAnime','EnableMusic','EnableBooks','EnableAniList','EnableJikan','EnableTmdb','EnableKitsu','EnableFanArt','EnableShikimori','EnableAnnict','MatchByName','PreferNameOverIds','EnrichOnDemand','AniDbEnabled'];
-            var texts = ['ApiBaseUrl','ApiKey','RequestTimeoutSeconds','PreferredLanguage','FallbackLanguage','TitlePreference','WriteMode','TmdbApiKey','GoogleBooksApiKey','FanArtApiKey','AnnictToken','AniDbClientName','AniDbClientVersion','AniDbUsername','AniDbPassword'];
+            var texts = ['ApiBaseUrl','ApiKey','RequestTimeoutSeconds','PreferredLanguage','FallbackLanguage','TitlePreference','WriteMode','CustomSourceMode','TmdbApiKey','GoogleBooksApiKey','FanArtApiKey','AnnictToken','AniDbClientName','AniDbClientVersion','AniDbUsername','AniDbPassword'];
 
             function norm(id) { return (id || '').replace(/-/g, '').toLowerCase(); }
             function isDisabled(id) { return disabled.indexOf(norm(id)) !== -1; }
@@ -379,6 +409,20 @@
                 if (type) overrides[n] = type; else delete overrides[n];
                 queueSave();
             }
+            // Each ranking mode gets a plain-language explanation under the select, so the choice
+            // does not depend on knowing how provider priorities work.
+            var customModeHints = {
+                Prefer:   'Your database wins every field it fills; the built-in sources supply the rest.',
+                Fallback: 'The built-in sources lead. Yours only fills what they left empty.',
+                Auto:     'Per entry: one with real content (overview, artwork or cast) wins, a bare stub steps behind the built-in sources.'
+            };
+
+            function showCustomModeHint() {
+                var sel = page.querySelector('#CustomSourceMode');
+                var hint = page.querySelector('#CustomSourceModeHint');
+                if (sel && hint) hint.textContent = customModeHints[sel.value] || '';
+            }
+
             // Self-hosted sources are edited as free text, one "Name | Location | Priority | Key" per line.
             function readCustomSources() {
                 var el = page.querySelector('#CustomSources');
@@ -551,6 +595,7 @@
                 texts.forEach(function (k) { var el = page.querySelector('#' + k); if (el) el.value = config[k] != null ? config[k] : ''; });
                 var sources = page.querySelector('#CustomSources');
                 if (sources) sources.value = (config.CustomSources || []).join('\n');
+                showCustomModeHint();
                 toggleRemote();
                 toggleAniDb();
             }
@@ -574,6 +619,7 @@
                 page.querySelector('#mhFilter').addEventListener('input', function () { onFilter(this.value.trim()); });
                 page.querySelector('#UseEmbeddedEngine').addEventListener('change', toggleRemote);
                 page.querySelector('#AniDbEnabled').addEventListener('change', toggleAniDb);
+                page.querySelector('#CustomSourceMode').addEventListener('change', showCustomModeHint);
                 page.querySelector('#mhTestConnection').addEventListener('click', testConnection);
                 page.querySelector('#mhGeneralForm').addEventListener('submit', function (e) { e.preventDefault(); saveForm(); return false; });
                 page.querySelector('#mhSourcesForm').addEventListener('submit', function (e) { e.preventDefault(); saveForm(); return false; });

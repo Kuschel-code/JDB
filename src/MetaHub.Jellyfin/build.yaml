@@ -18,8 +18,9 @@ changelog: >
   sources: a folder of JSON or Kodi/Jellyfin NFO files (artwork next to them is picked up), or
   your own HTTP endpoint. Add them under "Metadata sources" as "Name | Location | Priority |
   ApiKey" - the location decides the kind, and only it is required. They are matched by title
-  rather than by provider id, and by default outrank the built-in sources so your curated data
-  wins. Takes effect after a Jellyfin restart.
+  rather than by provider id. "When sources disagree" chooses whether your data wins, only fills
+  what the other sources miss, or is judged per entry (Auto: an entry with real content wins, a
+  bare stub steps behind). Takes effect after a Jellyfin restart.
   0.1.9.8 - Reliability and performance audit. A provider that timed out during a slow retry
   could silently abort the rest of a work's enrichment, or (on-demand) the whole item's Jellyfin
   refresh — fixed, plus AniDB's own throttle no longer risks extra requests from a generic retry

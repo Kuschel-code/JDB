@@ -192,9 +192,22 @@ Home API | https://meta.lan/metahub | 3 | s3cret
 ```
 
 Custom sources are matched by **title** (canonical, original, or any known translation),
-ignoring case and punctuation — no provider IDs required. `Priority` decides who wins a field
-conflict: lower wins, the built-in providers sit at 10–30, so the default of **5** lets your
-own data win. Changes apply after a Jellyfin restart.
+ignoring case and punctuation — no provider IDs required. Changes apply after a Jellyfin restart.
+
+### Who wins a conflict
+
+**When sources disagree** (`Enrichment:CustomSourceMode`) decides how your data ranks against
+the built-in providers:
+
+| Mode | Behavior |
+|------|----------|
+| `Prefer` *(default)* | Your database wins every field it fills; the built-in sources supply the rest. |
+| `Fallback` | The built-in sources lead; yours only fills what they left empty. |
+| `Auto` | Per entry: one carrying real content (an overview, artwork or cast) wins, while a bare stub — say just a title and a year — steps behind the built-in sources instead of overriding better data with scraps. |
+
+Merging is per field either way, so a source never blanks a field it has nothing for. The
+optional `Priority` column overrides the mode for one source (lower wins; the built-ins sit at
+10–30).
 
 ### Folder layout
 

@@ -1,6 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="MetaHub.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\MetaHub.Domain\MetaHub.Domain.csproj" />
     <ProjectReference Include="..\MetaHub.Identification\MetaHub.Identification.csproj" />
     <ProjectReference Include="..\MetaHub.Infrastructure\MetaHub.Infrastructure.csproj" />

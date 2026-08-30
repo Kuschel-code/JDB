@@ -34,7 +34,7 @@ public class CustomSourceTests
         Assert.True(CustomSource.TryParse("/mnt/nas/metadata", out var folder));
         Assert.Equal(CustomSourceKind.Folder, folder.Kind);
         Assert.Equal("metadata", folder.Name);
-        Assert.Equal(CustomSource.DefaultPriority, folder.Priority);
+        Assert.Null(folder.Priority);   // no explicit priority — the configured mode decides
 
         Assert.True(CustomSource.TryParse("https://meta.lan/db", out var http));
         Assert.Equal(CustomSourceKind.Http, http.Kind);
@@ -155,12 +155,29 @@ public class CustomSourceTests
     // --- folder source end to end ---
 
     private static CustomSourceService NewService(params CustomSource[] sources)
+        => NewService(CustomSourceMode.Prefer, sources);
+
+    private static CustomSourceService NewService(CustomSourceMode mode, params CustomSource[] sources)
     {
         var provider = new ServiceCollection().AddHttpClient().BuildServiceProvider();
-        var options = Options.Create(new EnrichmentOptions { CustomSources = sources.ToList() });
+        var options = Options.Create(new EnrichmentOptions
+        {
+            CustomSources = sources.ToList(),
+            CustomSourceMode = mode
+        });
         return new CustomSourceService(
             provider.GetRequiredService<IHttpClientFactory>(), options,
             NullLogger<CustomSourceService>.Instance);
+    }
+
+    /// <summary>Writes a folder source holding one entry, and returns its root.</summary>
+    private static async Task<string> SeedFolderAsync(string title, string json)
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"metahub-custom-{Guid.NewGuid():N}");
+        var dir = Path.Combine(root, title);
+        Directory.CreateDirectory(dir);
+        await File.WriteAllTextAsync(Path.Combine(dir, "metahub.json"), json);
+        return root;
     }
 
     [Fact]
@@ -182,7 +199,7 @@ public class CustomSourceTests
             var results = await service.FetchAsync(work, CancellationToken.None);
 
             var (priority, data) = Assert.Single(results);
-            Assert.Equal(CustomSource.DefaultPriority, priority);
+            Assert.Equal(CustomSource.PreferPriority, priority);
             Assert.Equal("From my own database.", data.Overview);
             Assert.Equal(2016, data.ReleaseYear);
             Assert.Equal(Path.Combine(showDir, "poster.jpg"), Assert.Single(data.Images).Url);
@@ -247,5 +264,74 @@ public class CustomSourceTests
         {
             Directory.Delete(root, true);
         }
+    }
+
+    // --- ranking modes ---
+
+    [Theory]
+    [InlineData(CustomSourceMode.Prefer, CustomSource.PreferPriority)]
+    [InlineData(CustomSourceMode.Fallback, CustomSource.FallbackPriority)]
+    [InlineData(CustomSourceMode.Auto, CustomSource.PreferPriority)]   // has an overview → trusted
+    public async Task Mode_decides_where_a_substantial_entry_ranks(CustomSourceMode mode, int expected)
+    {
+        var root = await SeedFolderAsync("My Show", """{ "overview": "Real content." }""");
+        try
+        {
+            var service = NewService(mode, new CustomSource { Kind = CustomSourceKind.Folder, Location = root });
+            var (priority, _) = Assert.Single(
+                await service.FetchAsync(new Work { CanonicalTitle = "My Show" }, CancellationToken.None));
+            Assert.Equal(expected, priority);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task Auto_puts_a_stub_entry_behind_the_built_in_providers()
+    {
+        // Only a title and a year: exactly the placeholder that must not override a fetched record.
+        var root = await SeedFolderAsync("My Show", """{ "title": "My Show", "year": 2021 }""");
+        try
+        {
+            var service = NewService(CustomSourceMode.Auto,
+                new CustomSource { Kind = CustomSourceKind.Folder, Location = root });
+
+            var (priority, _) = Assert.Single(
+                await service.FetchAsync(new Work { CanonicalTitle = "My Show" }, CancellationToken.None));
+            Assert.Equal(CustomSource.FallbackPriority, priority);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task An_explicit_priority_overrides_the_mode()
+    {
+        var root = await SeedFolderAsync("My Show", """{ "overview": "Real content." }""");
+        try
+        {
+            // Fallback mode would push this to the back; the explicit priority must still win.
+            var service = NewService(CustomSourceMode.Fallback,
+                new CustomSource { Kind = CustomSourceKind.Folder, Location = root, Priority = 2 });
+
+            var (priority, _) = Assert.Single(
+                await service.FetchAsync(new Work { CanonicalTitle = "My Show" }, CancellationToken.None));
+            Assert.Equal(2, priority);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void Substance_is_content_not_just_a_name()
+    {
+        var stub = CustomSourceParser.ParseJson("""{ "title": "My Show", "year": 2021 }""");
+        Assert.False(CustomSourceService.HasSubstance(stub));
+
+        foreach (var json in new[]
+                 {
+                     """{ "overview": "Text." }""",
+                     """{ "poster": "https://cdn.lan/p.jpg" }""",
+                     """{ "people": [{ "name": "Jane Doe", "role": "Actor" }] }""",
+                     """{ "overviews": { "de": "Text." } }"""
+                 })
+            Assert.True(CustomSourceService.HasSubstance(CustomSourceParser.ParseJson(json)), json);
     }
 }

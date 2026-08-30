@@ -76,6 +76,7 @@ Precedence (highest first): environment variables → `appsettings.{Environment}
 | `GoogleBooksApiKey` | empty | 🔒 Google Books API key (optional). |
 | `AnnictToken` | empty | 🔒 Annict personal access token (Japanese anime metadata; optional). |
 | `CustomSources` | empty | Metadata databases you host yourself — see below. |
+| `CustomSourceMode` | `Prefer` | How they rank against the built-ins: `Prefer` (yours wins), `Fallback` (only fills gaps), `Auto` (per entry — substantial wins, stubs step behind). |
 
 Provider priority (lower wins per field): AniList 10 · TMDB 15 · Jikan 20 (anime);
 TMDB 15 (movies/series); MusicBrainz 10 (music); Open Library 10 · Google Books 20 (books);
@@ -98,7 +99,7 @@ Each entry is a folder of JSON/NFO files or your own HTTP endpoint, matched by *
 | `Name` | derived | Display name (used in logs). Defaults to the folder name or URL host. |
 | `Kind` | `Folder` | `Folder` (files on disk) or `Http` (your own endpoint). |
 | `Location` | — | Absolute folder path or base URL. Required. |
-| `Priority` | `5` | Lower wins per field; the built-in providers sit at 10–30. |
+| `Priority` | by mode | Optional per-source override, lower wins; the built-in providers sit at 10–30. Omit it to follow `CustomSourceMode` (`Prefer` → 5, `Fallback` → 1000). |
 | `ApiKey` | empty | 🔒 Sent as the `X-Api-Key` header (HTTP sources only). |
 
 Responses are **not** cached as raw payloads — a local folder is already fast, and a
@@ -165,6 +166,7 @@ Tabs: **Connection · Library · Server · About**.
 |---------|---------|-------------|
 | TMDB / Google Books / Annict keys | empty | 🔒 Optional; a source without its key is skipped. |
 | Your own databases | empty | Self-hosted sources, one per line: `Name \| Location \| Priority \| ApiKey`. The location must be absolute — a URL is queried as an endpoint, anything else is read as a folder. Applied after a Jellyfin restart. See the [README](../README.md#your-own-metadata-databases). |
+| When sources disagree | `Prefer my database` | Whether your data wins over the built-in sources, only fills their gaps, or is judged per entry (*Auto*). |
 
 ### Server (read-only)
 

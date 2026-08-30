@@ -52,5 +52,14 @@ public class EnrichmentOptions
     /// HTTP endpoint. Matched by title (not by provider id) and merged at each source's own
     /// priority, which by default outranks the built-in providers.
     /// </summary>
-    public List<CustomSources.CustomSource> CustomSources { get; set; } = new();
+    public List<MetaHub.Enrichment.CustomSources.CustomSource> CustomSources { get; set; } = new();
+
+    /// <summary>
+    /// How those self-hosted sources rank against the built-in providers: <c>Prefer</c>
+    /// (default, your data wins), <c>Fallback</c> (only fills gaps) or <c>Auto</c> (per entry —
+    /// substantial entries win, stubs step behind). A source with an explicit priority ignores
+    /// this and uses that priority.
+    /// </summary>
+    public MetaHub.Enrichment.CustomSources.CustomSourceMode CustomSourceMode { get; set; }
+        = MetaHub.Enrichment.CustomSources.CustomSourceMode.Prefer;
 }

@@ -66,7 +66,7 @@ public class CustomSourceService
                     : await ReadFromHttpAsync(source, work, names, ct).ConfigureAwait(false);
 
                 if (data is not null)
-                    results.Add((source.Priority, data));
+                    results.Add((PriorityFor(source, data), data));
             }
             catch (Exception ex)
             {
@@ -76,6 +76,37 @@ public class CustomSourceService
 
         return results;
     }
+
+    /// <summary>
+    /// Where this result ranks against the built-in providers. An explicit per-source priority
+    /// always wins; otherwise the configured mode decides, and in <see cref="CustomSourceMode.Auto"/>
+    /// that decision is made per entry from how much the entry actually carries.
+    /// </summary>
+    private int PriorityFor(CustomSource source, NormalizedWorkData data)
+    {
+        if (source.Priority is { } explicitPriority)
+            return explicitPriority;
+
+        return _options.CustomSourceMode switch
+        {
+            CustomSourceMode.Fallback => CustomSource.FallbackPriority,
+            CustomSourceMode.Auto => HasSubstance(data)
+                ? CustomSource.PreferPriority
+                : CustomSource.FallbackPriority,
+            _ => CustomSource.PreferPriority
+        };
+    }
+
+    /// <summary>
+    /// Whether an entry carries real content rather than being a stub. A title and a year alone
+    /// are exactly what a half-filled placeholder holds, and letting that outrank a fully
+    /// fetched provider record is how "prefer my database" turns into worse metadata.
+    /// </summary>
+    internal static bool HasSubstance(NormalizedWorkData data)
+        => !string.IsNullOrWhiteSpace(data.Overview)
+           || data.Images.Count > 0
+           || data.Credits.Count > 0
+           || data.OverviewTranslations.Count > 0;
 
     /// <summary>Every title the work is known by — a folder may be named after any of them.</summary>
     private static List<string> NameCandidates(Work work)

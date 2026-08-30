@@ -1,5 +1,20 @@
 namespace MetaHub.Enrichment.CustomSources;
 
+/// <summary>How the user's own databases rank against the built-in providers.</summary>
+public enum CustomSourceMode
+{
+    /// <summary>Your data wins every field it supplies; the built-ins fill the rest. (Default.)</summary>
+    Prefer = 0,
+    /// <summary>The built-in providers lead; your data only fills what they left empty.</summary>
+    Fallback = 1,
+    /// <summary>
+    /// Decide per entry: an entry that actually carries content (an overview, artwork or cast)
+    /// is trusted and wins, while a stub — say a title and a year — steps behind the built-ins
+    /// instead of overriding their better data with its scraps.
+    /// </summary>
+    Auto = 2
+}
+
 /// <summary>Where a user-defined metadata source lives.</summary>
 public enum CustomSourceKind
 {
@@ -27,10 +42,13 @@ public enum CustomSourceKind
 public class CustomSource
 {
     /// <summary>
-    /// Default merge priority. Lower wins, and the built-in providers sit at 10–30, so a
-    /// self-hosted database outranks them by default: the user curated it, so it should win.
+    /// Priority given to a preferred source. Lower wins and the built-in providers sit at
+    /// 10–30, so this places a self-hosted database ahead of all of them.
     /// </summary>
-    public const int DefaultPriority = 5;
+    public const int PreferPriority = 5;
+
+    /// <summary>Priority given to a source that should only fill gaps — behind every built-in.</summary>
+    public const int FallbackPriority = 1000;
 
     /// <summary>Display name, used in logs and in the settings UI.</summary>
     public string Name { get; set; } = string.Empty;
@@ -43,8 +61,12 @@ public class CustomSource
     /// <summary>Optional key, sent as the <c>X-Api-Key</c> header (HTTP sources only).</summary>
     public string ApiKey { get; set; } = string.Empty;
 
-    /// <summary>Merge priority; lower wins over higher (same scale as the built-in providers).</summary>
-    public int Priority { get; set; } = DefaultPriority;
+    /// <summary>
+    /// Explicit merge priority for this one source (lower wins, same scale as the built-in
+    /// providers). <c>null</c> — the normal case — means "follow
+    /// <see cref="EnrichmentOptions.CustomSourceMode"/>".
+    /// </summary>
+    public int? Priority { get; set; }
 
     /// <summary>Parses one configuration line. Returns false for blank lines and comments (#).</summary>
     public static bool TryParse(string? line, out CustomSource source)
@@ -72,7 +94,7 @@ public class CustomSource
             return false;
 
         if (parts.Length > 2 && int.TryParse(parts[2], out var priority))
-            source.Priority = priority;
+            source.Priority = priority;   // explicit override; otherwise the mode decides
         if (parts.Length > 3)
             source.ApiKey = parts[3];
 
@@ -118,5 +140,6 @@ public class CustomSource
         return string.IsNullOrWhiteSpace(leaf) ? trimmed : leaf;
     }
 
-    public override string ToString() => $"{Name} ({Kind}: {Location}, priority {Priority})";
+    public override string ToString()
+        => $"{Name} ({Kind}: {Location}, priority {Priority?.ToString() ?? "by mode"})";
 }
