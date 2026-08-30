@@ -46,4 +46,11 @@ public class EnrichmentOptions
 
     /// <summary>Annict personal access token (annict.com) for Japanese anime metadata.</summary>
     public string AnnictToken { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Metadata databases the user hosts themselves — a folder of JSON/NFO files, or their own
+    /// HTTP endpoint. Matched by title (not by provider id) and merged at each source's own
+    /// priority, which by default outranks the built-in providers.
+    /// </summary>
+    public List<CustomSources.CustomSource> CustomSources { get; set; } = new();
 }

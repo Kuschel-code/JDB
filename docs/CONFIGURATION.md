@@ -74,9 +74,36 @@ Precedence (highest first): environment variables → `appsettings.{Environment}
 | `UserAgent` | `MetaHub/0.1 (+…)` | User-Agent for all providers (required by MusicBrainz/AniDB etiquette). |
 | `TmdbApiKey` | empty | 🔒 TMDB API key (movies/series; provider inert without it). |
 | `GoogleBooksApiKey` | empty | 🔒 Google Books API key (optional). |
+| `AnnictToken` | empty | 🔒 Annict personal access token (Japanese anime metadata; optional). |
+| `CustomSources` | empty | Metadata databases you host yourself — see below. |
 
 Provider priority (lower wins per field): AniList 10 · TMDB 15 · Jikan 20 (anime);
-TMDB 15 (movies/series); MusicBrainz 10 (music); Open Library 10 · Google Books 20 (books).
+TMDB 15 (movies/series); MusicBrainz 10 (music); Open Library 10 · Google Books 20 (books);
+Annict 30 (Japanese). Self-hosted sources default to **5**, ahead of all of them.
+
+#### `Enrichment:CustomSources` — your own databases
+
+Each entry is a folder of JSON/NFO files or your own HTTP endpoint, matched by **title**
+(canonical, original or any known translation) rather than by provider id:
+
+```json
+"CustomSources": [
+  { "Name": "My NAS", "Kind": "Folder", "Location": "/mnt/nas/metadata", "Priority": 5 },
+  { "Name": "Home API", "Kind": "Http", "Location": "https://meta.lan/metahub", "ApiKey": "s3cret", "Priority": 3 }
+]
+```
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `Name` | derived | Display name (used in logs). Defaults to the folder name or URL host. |
+| `Kind` | `Folder` | `Folder` (files on disk) or `Http` (your own endpoint). |
+| `Location` | — | Absolute folder path or base URL. Required. |
+| `Priority` | `5` | Lower wins per field; the built-in providers sit at 10–30. |
+| `ApiKey` | empty | 🔒 Sent as the `X-Api-Key` header (HTTP sources only). |
+
+Responses are **not** cached as raw payloads — a local folder is already fast, and a
+self-hosted endpoint is the user's own server. The document format (JSON fields, NFO support,
+folder layout, endpoint contract) is documented in the [README](../README.md#your-own-metadata-databases).
 
 ### `Scheduler` — background jobs (M7/M8)
 
@@ -131,6 +158,13 @@ Tabs: **Connection · Library · Server · About**.
 | Movies / Series / Anime / Music / Books | all on | Which media types this plugin provides metadata for. A disabled type returns no metadata/images even if MetaHub knows the work. |
 | Preferred language | `de` | Passed to MetaHub as `?lang=` for localized overviews. |
 | Fallback language | `en` | Used when the preferred language is unavailable. |
+
+### Metadata sources
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| TMDB / Google Books / Annict keys | empty | 🔒 Optional; a source without its key is skipped. |
+| Your own databases | empty | Self-hosted sources, one per line: `Name \| Location \| Priority \| ApiKey`. The location must be absolute — a URL is queried as an endpoint, anything else is read as a folder. Applied after a Jellyfin restart. See the [README](../README.md#your-own-metadata-databases). |
 
 ### Server (read-only)
 

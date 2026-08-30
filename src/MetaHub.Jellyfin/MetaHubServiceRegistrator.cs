@@ -46,6 +46,7 @@ public class MetaHubServiceRegistrator : IPluginServiceRegistrator
             o.GoogleBooksApiKey = c.GoogleBooksApiKey;
             o.FanArtApiKey = c.FanArtApiKey;
             o.AnnictToken = c.AnnictToken;
+            o.CustomSources = MetaHub.Enrichment.CustomSources.CustomSource.ParseAll(c.CustomSources);
             o.PreferredLanguage = c.PreferredLanguage;
             if (Enum.TryParse<EnrichmentWriteMode>(c.WriteMode, true, out var mode))
                 o.WriteMode = mode;

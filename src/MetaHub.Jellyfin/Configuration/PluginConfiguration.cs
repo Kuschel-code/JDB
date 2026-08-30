@@ -99,6 +99,17 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Annict personal access token (annict.com) for Japanese anime metadata (optional).</summary>
     public string AnnictToken { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Metadata databases you host yourself, one per line:
+    /// <code>Name | Location | [Priority] | [ApiKey]</code>
+    /// The location is either a folder holding JSON/NFO files (matched by title) or the URL of
+    /// your own HTTP endpoint — <c>http(s)://</c> selects the latter. Only the location is
+    /// required, and it must be absolute (a URL or a rooted path). Lower priority wins; the
+    /// built-in providers sit at 10-30, so the default of 5 lets your own data win. Applied
+    /// after a Jellyfin restart.
+    /// </summary>
+    public string[] CustomSources { get; set; } = System.Array.Empty<string>();
+
     // --- Embedded engine: AniDB identification (Shoko core) ---
 
     public bool AniDbEnabled { get; set; }

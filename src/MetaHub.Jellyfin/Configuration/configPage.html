@@ -251,6 +251,35 @@
                     </div>
 
                     <div class="mhCard">
+                        <h3>Your own databases</h3>
+                        <div class="fieldDescription" style="margin-bottom:.8em;">
+                            Add metadata databases you host yourself &mdash; a folder of files, or your own
+                            HTTP endpoint. They are matched by title and merged like any other source.
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="CustomSources">Sources (one per line)</label>
+                            <textarea id="CustomSources" is="emby-textarea" rows="4"
+                                      placeholder="My NAS | /mnt/nas/metadata&#10;Home API | https://meta.lan/metahub | 3 | secret"></textarea>
+                            <div class="fieldDescription">
+                                Format: <code>Name | Location | Priority | ApiKey</code> &mdash; only the location is
+                                required. A location starting with <code>http://</code> or <code>https://</code> is
+                                queried as an endpoint, anything else is read as a folder. Use an absolute path
+                                (<code>/mnt/nas/metadata</code>, <code>D:\Metadata</code>); relative paths are ignored.
+                            </div>
+                        </div>
+                        <div class="fieldDescription">
+                            <b>Folder layout:</b> one subfolder per title (or a file named after it), holding
+                            <code>metahub.json</code> or an <code>.nfo</code> file. Artwork such as
+                            <code>poster.jpg</code> next to it is picked up automatically. Folder names are matched
+                            ignoring case and punctuation.
+                            <br /><b>Endpoint:</b> receives <code>?title=&amp;year=&amp;type=</code> plus any known
+                            IDs and answers with the same JSON; the key is sent as the <code>X-Api-Key</code> header.
+                            <br /><b>Priority:</b> lower wins. The built-in sources sit at 10&ndash;30, so the
+                            default of 5 lets your own data win. Changes apply after a Jellyfin restart.
+                        </div>
+                    </div>
+
+                    <div class="mhCard">
                         <h3>AniDB file identification</h3>
                         <div class="fieldDescription" style="margin-bottom:.8em;">
                             Identifies anime files <b>exactly</b> by file hash (the Shoko principle) instead of
@@ -350,6 +379,13 @@
                 if (type) overrides[n] = type; else delete overrides[n];
                 queueSave();
             }
+            // Self-hosted sources are edited as free text, one "Name | Location | Priority | Key" per line.
+            function readCustomSources() {
+                var el = page.querySelector('#CustomSources');
+                if (!el) return config.CustomSources || [];
+                return el.value.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
+            }
+
             function queueSave() {
                 clearTimeout(saveTimer);
                 saveTimer = setTimeout(function () {
@@ -513,6 +549,8 @@
             function loadForm() {
                 checks.forEach(function (k) { var el = page.querySelector('#' + k); if (el) el.checked = !!config[k]; });
                 texts.forEach(function (k) { var el = page.querySelector('#' + k); if (el) el.value = config[k] != null ? config[k] : ''; });
+                var sources = page.querySelector('#CustomSources');
+                if (sources) sources.value = (config.CustomSources || []).join('\n');
                 toggleRemote();
                 toggleAniDb();
             }
@@ -525,6 +563,7 @@
                 config.AniDbClientVersion = parseInt(config.AniDbClientVersion, 10) || 1;
                 config.DisabledItemIds = disabled.slice();
                 config.LibraryTypeOverrides = serializeOverrides();
+                config.CustomSources = readCustomSources();
                 ApiClient.updatePluginConfiguration(pluginId, config).then(Dashboard.processPluginConfigurationUpdateResult);
             }
 

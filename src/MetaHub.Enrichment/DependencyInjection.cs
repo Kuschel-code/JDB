@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using MetaHub.Enrichment.CustomSources;
 using MetaHub.Enrichment.Providers;
 using MetaHub.Identification.AniDb;
 using Polly;
@@ -36,6 +37,10 @@ public static class DependencyInjection
         // abuse detection is tuned to punish exactly that.
         AddResilientClient(services, AniDbHttpClient.HttpClientName, maxResponseBytes: 8 * 1024 * 1024, retryCount: 0);
 
+        // The endpoint URL is the user's own and may carry credentials in its query, so keep it
+        // out of the log the same way the keyed providers do.
+        AddResilientClient(services, CustomSourceService.HttpClientName, redactUrl: true);
+
         // Anime
         services.AddScoped<IMetadataProvider, AniListProvider>();
         services.AddScoped<IMetadataProvider, JikanProvider>();
@@ -56,6 +61,9 @@ public static class DependencyInjection
 
         // Shared across every caller (not scoped) — see MusicBrainzRateLimiter's doc comment.
         services.AddSingleton<MusicBrainzRateLimiter>();
+
+        // User-hosted databases (folder of files or own HTTP endpoint), matched by title.
+        services.AddScoped<CustomSourceService>();
 
         services.AddScoped<JikanEpisodeSync>();
         services.AddScoped<AniDbEpisodeSync>();
