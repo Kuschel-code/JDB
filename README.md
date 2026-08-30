@@ -169,6 +169,107 @@ Highlights:
   ban backoff are built in.
 - **Scheduling** — embedded mode uses Jellyfin Scheduled Tasks; server mode has a built-in
   background scheduler (`Scheduler` section).
+- **Your own databases** — add self-hosted sources (a folder of files, or your own endpoint);
+  see below.
+
+## Your own metadata databases
+
+Besides the built-in sources you can add databases you host yourself. Configure them in
+**Metadata sources → Your own databases** (embedded mode) or under `Enrichment:CustomSources`
+(server mode), one per line:
+
+```
+Name | Location | Priority | ApiKey
+```
+
+Only the location is required and it must be absolute. A location starting with `http://` or
+`https://` is queried as an endpoint, anything else is read as a folder:
+
+```
+My NAS   | /mnt/nas/metadata
+Home API | https://meta.lan/metahub | 3 | s3cret
+/srv/anime-db
+```
+
+Custom sources are matched by **title** (canonical, original, or any known translation),
+ignoring case and punctuation — no provider IDs required. Changes apply after a Jellyfin restart.
+
+### Who wins a conflict
+
+**When sources disagree** (`Enrichment:CustomSourceMode`) decides how your data ranks against
+the built-in providers:
+
+| Mode | Behavior |
+|------|----------|
+| `Prefer` *(default)* | Your database wins every field it fills; the built-in sources supply the rest. |
+| `Fallback` | The built-in sources lead; yours only fills what they left empty. |
+| `Auto` | Per entry: one carrying real content (an overview, artwork or cast) wins, while a bare stub — say just a title and a year — steps behind the built-in sources instead of overriding better data with scraps. |
+
+Merging is per field either way, so a source never blanks a field it has nothing for. The
+optional `Priority` column overrides the mode for one source (lower wins; the built-ins sit at
+10–30).
+
+### Folder layout
+
+One subfolder per title (or a file named after it), holding `metahub.json` or an `.nfo`:
+
+```
+/mnt/nas/metadata/
+├── The Disastrous Life of Saiki K/
+│   ├── metahub.json
+│   ├── poster.jpg
+│   └── fanart.jpg
+└── My Movie.json
+```
+
+Recognized file names are `metahub.json`, `metadata.json`, `info.json`, `movie.nfo`,
+`tvshow.nfo`, `album.nfo`, `book.nfo` — otherwise the first `.json`/`.nfo` in the folder is
+used. Kodi/Jellyfin **NFO** sidecars are understood as-is, so an existing library works
+without conversion. Artwork referenced relatively is read from next to the metadata file.
+
+### JSON document
+
+Every field is optional; supply only what you have.
+
+```json
+{
+  "title": "My Show",
+  "originalTitle": "Meine Serie",
+  "year": 2021,
+  "overview": "An overview.",
+  "overviews": { "de": "Eine Beschreibung." },
+  "titles": { "en": "My Show", "ja": "マイショー" },
+  "status": "Finished",
+  "genres": ["Action", "Drama"],
+  "episodeCount": 12,
+  "network": "My Studio",
+  "poster": "poster.jpg",
+  "images": [
+    { "type": "backdrop", "url": "fanart.jpg", "lang": "de", "width": 1920, "height": 1080 }
+  ],
+  "people": [
+    { "name": "Jane Doe", "role": "Actor", "character": "Hero", "order": 0 }
+  ]
+}
+```
+
+`type` is one of `poster`, `backdrop`/`fanart`, `banner`, `logo`, `thumb`, `cover`; `role` is a
+credit role such as `Actor`, `Director`, `Writer`, `Composer`, `Author`, `VoiceActor`. Music and
+book fields (`label`, `albumType`, `trackCount`, `isbn13`, `pageCount`, `publisher`) are
+supported too.
+
+### HTTP endpoint
+
+Your endpoint receives the title and everything MetaHub already knows and answers with the same
+JSON document:
+
+```
+GET https://meta.lan/metahub?title=My%20Show&type=Series&year=2021&anidb=1234
+X-Api-Key: s3cret
+```
+
+Answer `404` when you do not have the title. A bare array or a `{"data": …}` / `{"work": …}`
+envelope is accepted as well, so a small search API needs no extra shaping.
 
 ## API endpoints (server mode)
 

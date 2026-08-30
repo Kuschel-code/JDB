@@ -46,5 +46,8 @@ public enum ExternalIdSource
     Wikidata = 50,
 
     // Artwork-only provider source (not stored as an item external id)
-    FanArtTv = 51
+    FanArtTv = 51,
+
+    /// <summary>A metadata database the user hosts themselves (folder of files or own HTTP endpoint).</summary>
+    Custom = 60
 }

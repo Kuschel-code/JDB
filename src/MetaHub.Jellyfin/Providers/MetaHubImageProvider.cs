@@ -87,5 +87,52 @@ public class MetaHubImageProvider : IRemoteImageProvider, IHasOrder
     }
 
     public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
-        => _httpClientFactory.CreateClient(nameof(MetaHubApiClient)).GetAsync(url, cancellationToken);
+    {
+        // Artwork from a self-hosted folder source is a path on disk rather than a URL — serve it
+        // straight from the file system instead of trying to fetch it over HTTP.
+        if (TryGetLocalFile(url, out var path))
+            return Task.FromResult(LocalFileResponse(path));
+
+        return _httpClientFactory.CreateClient(nameof(MetaHubApiClient)).GetAsync(url, cancellationToken);
+    }
+
+    /// <summary>Recognizes a local artwork reference (a rooted path or a file:// URL).</summary>
+    private static bool TryGetLocalFile(string url, out string path)
+    {
+        path = string.Empty;
+        if (string.IsNullOrWhiteSpace(url))
+            return false;
+
+        if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var candidate = url.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
+                        && Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            ? uri.LocalPath
+            : url;
+
+        if (!Path.IsPathRooted(candidate) || !File.Exists(candidate))
+            return false;
+
+        path = candidate;
+        return true;
+    }
+
+    private static HttpResponseMessage LocalFileResponse(string path)
+    {
+        var content = new StreamContent(File.OpenRead(path));
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(ContentType(path));
+        return new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = content };
+    }
+
+    private static string ContentType(string path) => Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".png" => "image/png",
+        ".webp" => "image/webp",
+        ".gif" => "image/gif",
+        ".bmp" => "image/bmp",
+        ".svg" => "image/svg+xml",
+        _ => "image/jpeg"
+    };
 }

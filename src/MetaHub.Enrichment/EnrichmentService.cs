@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using MetaHub.Domain;
 using MetaHub.Domain.Entities;
 using MetaHub.Domain.Enums;
+using MetaHub.Enrichment.CustomSources;
 using MetaHub.Infrastructure;
 
 namespace MetaHub.Enrichment;
@@ -23,6 +24,7 @@ public class EnrichmentService
 
     private readonly JikanEpisodeSync? _episodeSync;
     private readonly AniDbEpisodeSync? _aniDbEpisodeSync;
+    private readonly CustomSourceService? _customSources;
 
     public EnrichmentService(
         MetaHubDbContext db,
@@ -30,7 +32,8 @@ public class EnrichmentService
         IOptions<EnrichmentOptions> options,
         ILogger<EnrichmentService> log,
         JikanEpisodeSync? episodeSync = null,
-        AniDbEpisodeSync? aniDbEpisodeSync = null)
+        AniDbEpisodeSync? aniDbEpisodeSync = null,
+        CustomSourceService? customSources = null)
     {
         _db = db;
         _options = options.Value;
@@ -42,6 +45,7 @@ public class EnrichmentService
         _log = log;
         _episodeSync = episodeSync;
         _aniDbEpisodeSync = aniDbEpisodeSync;
+        _customSources = customSources;
     }
 
     public async Task<EnrichmentResult> EnrichAsync(
@@ -68,7 +72,9 @@ public class EnrichmentService
             ? _options.TtlOngoingDays
             : _options.TtlFinishedDays);
 
-        var collected = new List<NormalizedWorkData>();
+        // Priority is tracked per entry so user-hosted sources can outrank (or trail) the
+        // built-in providers according to their configured priority.
+        var collected = new List<(int Priority, NormalizedWorkData Data)>();
         var result = new EnrichmentResult { WorkId = workId, Found = true };
 
         foreach (var provider in _providers)
@@ -105,7 +111,7 @@ public class EnrichmentService
                     await UpdateFetchLogAsync(provider.Source, ct);
                 }
 
-                collected.Add(provider.Parse(body));
+                collected.Add((provider.Priority, provider.Parse(body)));
                 result.Applied.Add($"{provider.Source}{(fromCache ? " (cached)" : "")}");
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -123,9 +129,22 @@ public class EnrichmentService
             }
         }
 
+        // Databases the user hosts themselves. They are matched by title rather than by an
+        // external id, so they are queried outside the provider loop; responses are not cached
+        // as raw payloads (a local folder is already fast, and an own server is the user's).
+        if (_customSources is { HasSources: true })
+        {
+            foreach (var (priority, data) in await _customSources.FetchAsync(work, ct))
+            {
+                collected.Add((priority, data));
+                result.Applied.Add(ExternalIdSource.Custom.ToString());
+            }
+        }
+
         if (collected.Count > 0)
             await new WorkMerger(_db).ApplyAsync(
-                work, collected, writeMode ?? _options.WriteMode, _options.PreferredLanguage, ct);
+                work, collected.OrderBy(entry => entry.Priority).Select(entry => entry.Data).ToList(),
+                writeMode ?? _options.WriteMode, _options.PreferredLanguage, ct);
 
         ExtendSearchTitles(work);
 
