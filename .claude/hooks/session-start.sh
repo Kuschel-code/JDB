@@ -3,7 +3,7 @@
 #
 # Cloud containers ship without a .NET SDK — `dotnet` is not on PATH at all — so a web
 # session cannot build or test and has to push and wait for CI to learn whether the code
-# compiles. This installs the SDK the projects target (net9.0) and warms the NuGet cache,
+# compiles. This installs the SDK the projects target (net10.0) and warms the NuGet cache,
 # so `dotnet build` / `dotnet test` work from the first turn.
 #
 # Local sessions are left alone: they already have whatever SDK the developer installed.
@@ -12,7 +12,7 @@ set -euo pipefail
 # Web/cloud only.
 [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] || exit 0
 
-DOTNET_CHANNEL="9.0"
+DOTNET_CHANNEL="10.0"
 
 # Prefer an SDK the environment's setup script already provisioned (that one lives in the
 # cached filesystem snapshot; anything this hook installs does not, because the snapshot is
@@ -29,8 +29,8 @@ export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
 
 log() { echo "[session-start] $*" >&2; }
 
-has_net9() {
-    command -v dotnet >/dev/null 2>&1 && dotnet --list-sdks 2>/dev/null | grep -q '^9\.'
+has_net10() {
+    command -v dotnet >/dev/null 2>&1 && dotnet --list-sdks 2>/dev/null | grep -q '^10\.'
 }
 
 # Verified 2026-08-20: this environment's egress policy answers 403 to
@@ -49,7 +49,7 @@ blocked_note() {
 }
 
 # 1. SDK — idempotent, so a cached container skips straight past it.
-if has_net9; then
+if has_net10; then
     log "SDK $(dotnet --version) already present, skipping install"
 else
     log "installing .NET $DOTNET_CHANNEL SDK into $DOTNET_ROOT (~200 MB, once per container)"

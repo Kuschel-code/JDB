@@ -1,6 +1,6 @@
 # MetaHub (JDB) — Jellyfin metadata aggregator plugin
 
-.NET 9 · Jellyfin 10.11 plugin SDK · EF Core · xUnit. Builds one canonical record per work
+.NET 10 · Jellyfin 12 plugin SDK · EF Core · xUnit. Builds one canonical record per work
 from many providers, cross-links by ID, caches locally. **Metadata only.**
 
 Depth lives in `docs/BRAIN.md` (architecture, decisions, session history) and
@@ -37,7 +37,7 @@ list contains `dotnet.microsoft.com` but without a `*.` prefix, so the subdomain
 
 If `dotnet` is missing, **don't burn turns trying to install it** — verify through CI:
 push the branch and read the `build-test` job. Locally, if only .NET 8/10 are installed,
-set `DOTNET_ROLL_FORWARD=Major` so `net9.0` runs on the .NET 10 runtime.
+use a .NET 10 SDK — everything targets `net10.0` since v0.2.0.0.
 
 ## Layout
 
@@ -71,8 +71,9 @@ picks per call. Almost every bug that reached users was embedded-only.
 - **SQLite can't `ORDER BY` a `DateTimeOffset`.** Already handled — but mirror any
   `Replace` chain between C# (`NormTitle`) and EF queries or fuzzy matching silently
   diverges.
-- **targetAbi `10.11.0.0` + `net9.0`.** A net8/10.10 plugin is not broken, it is *invisible*
-  in the 10.11 catalog, which looks like a packaging bug and isn't.
+- **targetAbi `12.0.0.0` + `net10.0`** (since v0.2.0.0). The catalog filters by targetAbi, so a
+  10.11 server keeps seeing v0.1.9.9 and a 12.x server gets 0.2.x. EF Core / Microsoft.Extensions
+  must track Jellyfin's own stack (10.0.11 for 12.0) or plugin load fails on a version clash.
 - **Keyed providers are inert without a key** (TMDB, fanart.tv, Annict, AniDB) and are
   fixture-tested only. "Provider returns nothing" usually means no key or a blocked CDN,
   not a parser bug.

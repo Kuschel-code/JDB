@@ -1,9 +1,9 @@
 ---
 name: "MetaHub"
 guid: "a3f1c2d4-5b6e-47a8-9c0d-1e2f3a4b5c6d"
-version: "0.1.9.9"
-targetAbi: "10.11.0.0"
-framework: "net9.0"
+version: "0.2.0.0"
+targetAbi: "12.0.0.0"
+framework: "net10.0"
 owner: "kuschel-code"
 overview: "Aggregated, cross-linked metadata and artwork from a self-hosted MetaHub instance."
 description: >
@@ -14,6 +14,8 @@ category: "Metadata"
 artifacts:
   - "MetaHub.Jellyfin.dll"
 changelog: >
+  0.2.0.0 - Jellyfin 12. Requires Jellyfin 12.0 or newer. Built for .NET 10 against Jellyfin.Controller 12.0.0 with targetAbi 12.0.0.0, so it loads on 12.0 and 12.1; Jellyfin 10.11 servers keep offering the previous release. EF Core and Microsoft.Extensions follow Jellyfin 12's
+  10.0.11 stack (Npgsql EF provider 10.0.3); no schema change, the embedded cache is kept.
   0.1.9.9 - You can now add metadata databases you host yourself, alongside the built-in
   sources: a folder of JSON or Kodi/Jellyfin NFO files (artwork next to them is picked up), or
   your own HTTP endpoint. Add them under "Metadata sources" as "Name | Location | Priority |

@@ -42,18 +42,20 @@ docs/                       CONCEPT.md, CONFIGURATION.md, DATA_SOURCES.md, BRAIN
 
 ## Critical environment facts (don't relearn these)
 
-- **Target: .NET 9 + Jellyfin 10.11** (`Jellyfin.Controller` 10.11.x ships as `net9.0`).
-  A net8/10.10 plugin is **invisible in the 10.11 catalog** (ABI mismatch). targetAbi
-  `10.11.0.0`, framework `net9.0`. EF Core / Microsoft.Extensions aligned to **9.0.11**
-  (matches Jellyfin's stack); Npgsql EF provider stays 9.0.4 (latest, compatible).
+- **Target: .NET 10 + Jellyfin 12** since v0.2.0.0 (`Jellyfin.Controller` 12.0.0 ships as
+  `net10.0`; Jellyfin dropped the "10." prefix, 10.11 → 12.0, no 11). targetAbi `12.0.0.0`,
+  framework `net10.0`. EF Core / Microsoft.Extensions aligned to **10.0.11** (Jellyfin 12's
+  stack); Npgsql EF provider 10.0.3. Jellyfin 12 also rejects legacy auth by default
+  (`X-Emby-Token`, `api_key=`) — use `Authorization: MediaBrowser Token="…"` or `ApiKey=`.
+  Before that: .NET 9 / Jellyfin 10.11 / 9.0.11 through v0.1.9.9.
 - **Cloud containers ship without a .NET SDK**, so the environment's **setup script**
   installs it (that runs before Claude Code and its filesystem is cached, unlike a
   SessionStart hook). This needs the environment's network policy to allow
   `*.dotnet.microsoft.com` — the Trusted list has `dotnet.microsoft.com` without a `*.`
   prefix, so `builds.dotnet.microsoft.com`, where `dot.net` redirects, is not covered.
   With that allowed, `dotnet build` and `dotnet test` work from a cloud session
-  (verified 2026-08-21, SDK 9.0.317). Without it, CI is the only gate. On a machine that
-  has only .NET 8/10 installed, set `DOTNET_ROLL_FORWARD=Major` so net9 runs on .NET 10.
+  (verified 2026-08-21, SDK 9.0.317). Without it, CI is the only gate. Needs a .NET 10 SDK
+  since v0.2.0.0.
 - **Plugin zip bundle list** (Jellyfin provides EF Core/SQLite/Microsoft.Extensions, so we
   only ship what it doesn't): `MetaHub.*.dll`, `Npgsql.dll`,
   `Npgsql.EntityFrameworkCore.PostgreSQL.dll`, `Polly.dll`, `Polly.Extensions.Http.dll`,
@@ -186,6 +188,7 @@ docs/                       CONCEPT.md, CONFIGURATION.md, DATA_SOURCES.md, BRAIN
 - Added GitHub release workflow (zips on tag) + plugin repository manifest + install link.
 - Added embedded plugin mode (SQLite, in-process engine, scheduled tasks).
 - Retargeted everything to .NET 9 / Jellyfin 10.11 — fixed "plugin not in catalog".
+- Retargeted to .NET 10 / Jellyfin 12 (2026-09-23) — v0.2.0.0; 282 tests green on net10.0.
 - Restructured settings page repeatedly (tabs → native look) per user feedback.
 - Season/episode providers; Japanese sources (Annict/ARM/Jikan episodes).
 - Cast & crew end to end.

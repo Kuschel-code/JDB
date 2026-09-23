@@ -6,8 +6,8 @@
 
 [![CI](https://github.com/Kuschel-code/JDB/actions/workflows/ci.yml/badge.svg)](https://github.com/Kuschel-code/JDB/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Kuschel-code/JDB?sort=semver)](https://github.com/Kuschel-code/JDB/releases/latest)
-[![.NET](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/)
-[![Jellyfin](https://img.shields.io/badge/Jellyfin-10.11-00A4DC)](https://jellyfin.org/)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
+[![Jellyfin](https://img.shields.io/badge/Jellyfin-12-00A4DC)](https://jellyfin.org/)
 
 MetaHub builds a single canonical, unified view per media item by combining several
 official providers, cross-linking them by ID and caching everything locally — so
@@ -31,6 +31,18 @@ only then aggregates metadata.
 | **Standalone server** | Separate ASP.NET API + workers | **PostgreSQL** or SQLite | Non-Jellyfin clients, multi-app setups |
 
 ---
+
+## Compatibility
+
+| Jellyfin server | MetaHub plugin | .NET |
+|---|---|---|
+| **12.0, 12.1+** | **0.2.x** | 10 |
+| 10.11.x | 0.1.9.9 (last 10.11 build) | 9 |
+
+The repository below serves both: Jellyfin only offers the build whose `targetAbi` fits your
+server, so a 10.11 server keeps seeing 0.1.9.9 and a 12.x server gets 0.2.x. Upgrading a
+server from 10.11 to 12? Update the plugin from the catalog after the upgrade and restart —
+the embedded database is kept.
 
 ## Get started — Jellyfin plugin (embedded, no Docker)
 
@@ -80,6 +92,8 @@ in front if you need remote access.
 
 ### From source
 
+Needs the **.NET 10 SDK**.
+
 ```bash
 dotnet run --project src/MetaHub.Api    # needs a PostgreSQL (or: docker compose up db)
 ```
@@ -124,7 +138,7 @@ anime metadata. Both are ban-aware (automatic backoff) and never fetch uncached 
 
 | Layer            | Choice                                          |
 |------------------|-------------------------------------------------|
-| Runtime          | .NET 9 (matches Jellyfin 10.11)                 |
+| Runtime          | .NET 10 (matches Jellyfin 12)                   |
 | Web API          | ASP.NET Core Minimal APIs                       |
 | ORM / DB         | EF Core — SQLite (embedded) or PostgreSQL (server) |
 | HTTP resilience  | `IHttpClientFactory` + Polly                    |
@@ -315,7 +329,7 @@ dotnet build      # build all projects
 dotnet test       # unit + SQLite integration tests
 ```
 
-**Cutting a release:** push a tag (`git tag v0.1.0 && git push origin v0.1.0`) **or** run it
+**Cutting a release:** push a tag (`git tag v0.2.0.0 && git push origin v0.2.0.0`) **or** run it
 from the UI — **Actions → Release → Run workflow**, enter the version. The workflow creates the
 tag + GitHub Release, builds the runtime zips and the Jellyfin plugin zip, and updates
 [`manifest.json`](manifest.json) (with the plugin zip's MD5) so the plugin repository link

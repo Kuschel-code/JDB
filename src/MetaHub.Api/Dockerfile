@@ -1,5 +1,5 @@
 # Build the MetaHub API as a container image.
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Restore first for better layer caching (copy every project the API references).
@@ -16,7 +16,7 @@ RUN dotnet restore src/MetaHub.Api/MetaHub.Api.csproj
 COPY . .
 RUN dotnet publish src/MetaHub.Api/MetaHub.Api.csproj -c Release -o /app --no-restore
 
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app ./
 EXPOSE 8080

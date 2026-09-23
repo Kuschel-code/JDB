@@ -1,0 +1,4 @@
+# Host build output must not overwrite the container restore (NETSDK1064).
+**/bin/
+**/obj/
+.git/

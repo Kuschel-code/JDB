@@ -56,7 +56,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "9.0.x"
+          dotnet-version: "10.0.x"
 
       - name: Publish API (${{ matrix.rid }})
         run: |
@@ -88,7 +88,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "9.0.x"
+          dotnet-version: "10.0.x"
 
       - name: Stamp plugin version
         # Jellyfin derives the installed version from the assembly (and the generated meta.json).
@@ -182,7 +182,7 @@ jobs:
           ENTRY=$(jq -n \
             --arg version "$VERSION" \
             --arg changelog "Release $TAG" \
-            --arg targetAbi "10.11.0.0" \
+            --arg targetAbi "12.0.0.0" \
             --arg sourceUrl "$SOURCE_URL" \
             --arg checksum "$CHECKSUM" \
             --arg timestamp "$TS" \
